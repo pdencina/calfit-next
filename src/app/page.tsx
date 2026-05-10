@@ -5,12 +5,9 @@ export default async function HomePage() {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      redirect('/dashboard')
-    } else {
-      redirect('/login')
-    }
-  } catch {
-    redirect('/login')
-  }
+    if (user) redirect('/dashboard')
+  } catch {}
+
+  // No logueado → mostrar landing estática
+  redirect('/landing')
 }
