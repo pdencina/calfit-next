@@ -1,0 +1,112 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+:root {
+  --black:    #070707;
+  --surface1: #111;
+  --surface2: #191919;
+  --surface3: #222;
+  --border:   rgba(255,255,255,0.07);
+  --lime:     #c8f542;
+  --white:    #f0efe8;
+  --muted:    #666;
+  --danger:   #f87171;
+  --success:  #4ade80;
+  --warning:  #fbbf24;
+  --info:     #60a5fa;
+  --sidebar-w: 240px;
+  --topbar-h:  58px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--black);
+  color: var(--white);
+  -webkit-font-smoothing: antialiased;
+}
+
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.main-content {
+  margin-left: var(--sidebar-w);
+  flex: 1;
+  padding: 32px 28px;
+  min-height: 100vh;
+}
+
+/* Cards */
+.card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px 20px; border-radius: 8px; font-size: 14px;
+  font-family: 'DM Sans', sans-serif; font-weight: 500;
+  border: none; cursor: pointer; transition: all 0.15s;
+}
+.btn:hover { opacity: 0.85; transform: translateY(-1px); }
+.btn-primary { background: var(--lime); color: var(--black); font-family: 'Bebas Neue', sans-serif; font-size: 16px; letter-spacing: 2px; }
+.btn-ghost   { background: transparent; border: 1px solid rgba(255,255,255,0.15); color: var(--muted); }
+.btn-ghost:hover { border-color: var(--lime); color: var(--lime); }
+
+/* Form */
+.form-group { margin-bottom: 18px; }
+.form-group label { display: block; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.form-group input, .form-group select, .form-group textarea {
+  width: 100%; padding: 11px 14px;
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  border-radius: 8px; color: var(--white);
+  font-size: 14px; font-family: 'DM Sans', sans-serif;
+  outline: none; transition: border-color 0.2s;
+}
+.form-group input:focus, .form-group select:focus { border-color: var(--lime); }
+
+/* Page */
+.page-title { font-family: 'Bebas Neue', sans-serif; font-size: 36px; letter-spacing: 3px; margin-bottom: 4px; }
+.page-sub { font-size: 13px; color: var(--muted); margin-bottom: 28px; }
+
+/* Loader */
+.loader { display: flex; align-items: center; justify-content: center; padding: 60px; color: var(--muted); gap: 10px; font-size: 13px; }
+.spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.1); border-top-color: var(--lime); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Grid */
+.grid-2 { display: grid; grid-template-columns: repeat(2,1fr); gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
+
+/* Badge */
+.badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+.badge-lime    { background: rgba(200,245,66,0.1);  color: var(--lime); }
+.badge-success { background: rgba(74,222,128,0.1);  color: var(--success); }
+.badge-danger  { background: rgba(248,113,113,0.1); color: var(--danger); }
+.badge-warning { background: rgba(251,191,36,0.1);  color: var(--warning); }
+
+/* Alerts */
+.alert { padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
+.alert-error   { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.2); color: var(--danger); }
+.alert-success { background: rgba(74,222,128,0.1);  border: 1px solid rgba(74,222,128,0.2);  color: var(--success); }
+
+/* Empty */
+.empty { text-align: center; padding: 60px 20px; }
+.empty-icon { font-size: 40px; margin-bottom: 12px; opacity: 0.3; }
+.empty-title { font-family: 'Bebas Neue', sans-serif; font-size: 24px; letter-spacing: 2px; color: var(--muted); margin-bottom: 8px; }
+.empty-sub { font-size: 13px; color: var(--muted); }
+
+/* Responsive */
+@media (max-width: 900px) {
+  .main-content { margin-left: 0; padding: 16px; }
+  .grid-3, .grid-4 { grid-template-columns: repeat(2,1fr); }
+}
+@media (max-width: 600px) {
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+}
