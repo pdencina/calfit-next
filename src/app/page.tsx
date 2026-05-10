@@ -7,7 +7,5 @@ export default async function HomePage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) redirect('/dashboard')
   } catch {}
-
-  // No logueado → mostrar landing estática
   redirect('/landing')
 }
