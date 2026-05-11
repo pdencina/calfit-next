@@ -2,130 +2,205 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import './login.css'
+
+type Mode = 'login' | 'register'
+type Role = 'profe' | 'alumno'
 
 export default function LoginPage() {
-  const supabase = createClient()
-  const [email, setEmail] = useState('encinaacevedo.pablo@gmail.com')
+  const [mode, setMode] = useState<Mode>('login')
+  const [role, setRole] = useState<Role>('alumno')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [academyCode, setAcademyCode] = useState('ASD123')
   const [loading, setLoading] = useState(false)
-  const [errorMsg, setErrorMsg] = useState('')
+  const [error, setError] = useState('')
+  const [ok, setOk] = useState('')
 
-  const handleLogin = async (e: React.FormEvent) => {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    setError('')
+    setOk('')
     setLoading(true)
-    setErrorMsg('')
+
+    const supabase = createClient()
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      })
+      const cleanEmail = email.trim().toLowerCase()
+      const cleanCode = academyCode.trim().toUpperCase()
 
-      console.log('LOGIN DATA:', data)
-      console.log('LOGIN ERROR:', error)
+      if (mode === 'login') {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password,
+        })
 
-      if (error) {
-        setErrorMsg(error.message)
-        setLoading(false)
+        if (error) throw error
+
+        window.location.href = '/dashboard'
         return
       }
 
-      window.location.href = '/dashboard'
+      const { data: academia, error: academyError } = await supabase
+        .from('academias')
+        .select('id,codigo,nombre,name')
+        .eq('codigo', cleanCode)
+        .eq('is_active', true)
+        .maybeSingle()
+
+      if (academyError) throw academyError
+
+      if (!academia) {
+        throw new Error('El código de academia no existe o no está activo.')
+      }
+
+      const { data, error } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password,
+        options: {
+          data: {
+            full_name: fullName.trim(),
+            role,
+            academia_code: cleanCode,
+          },
+        },
+      })
+
+      if (error) throw error
+
+      // Si Supabase tiene confirmación de email desactivada, habrá sesión inmediata.
+      if (data.session) {
+        window.location.href = '/dashboard'
+        return
+      }
+
+      setOk('Cuenta creada. Revisa tu correo para confirmar el acceso.')
+      setMode('login')
     } catch (err: any) {
-      console.error('LOGIN CATCH:', err)
-      setErrorMsg(err?.message || 'Error inesperado al iniciar sesión')
+      setError(err?.message || 'Error inesperado')
+    } finally {
       setLoading(false)
     }
   }
 
   return (
-    <main style={{
-      minHeight: '100vh',
-      background: 'radial-gradient(circle at top, #18210f 0%, #050505 45%, #000 100%)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 24,
-      fontFamily: 'Arial, sans-serif',
-      color: '#fff'
-    }}>
-      <section style={{
-        width: '100%',
-        maxWidth: 520,
-        background: 'rgba(24,24,27,0.94)',
-        border: '1px solid #2a2a2a',
-        borderRadius: 28,
-        padding: 42
-      }}>
-        <div style={{ textAlign: 'center', marginBottom: 36 }}>
-          <h1 style={{ color: '#c6ff32', fontSize: 64, letterSpacing: 12, margin: 0, fontWeight: 900 }}>
-            CALFIT
-          </h1>
-          <p style={{ color: '#777', letterSpacing: 8, marginTop: 12, fontSize: 13 }}>
-            PLATAFORMA PRO
-          </p>
+    <div className="login-page">
+      <div className="login-bg" />
+
+      <div className="login-brand">CALFIT</div>
+      <div className="login-sub">PLATAFORMA PRO</div>
+
+      <div className="login-box">
+        <div className="login-tabs">
+          <button
+            className={`login-tab ${mode === 'login' ? 'active' : ''}`}
+            onClick={() => {
+              setMode('login')
+              setError('')
+              setOk('')
+            }}
+            type="button"
+          >
+            Ingresar
+          </button>
+
+          <button
+            className={`login-tab ${mode === 'register' ? 'active' : ''}`}
+            onClick={() => {
+              setMode('register')
+              setError('')
+              setOk('')
+            }}
+            type="button"
+          >
+            Registrarse
+          </button>
         </div>
 
-        <form onSubmit={handleLogin}>
-          <label style={label}>EMAIL</label>
-          <input style={input} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <form onSubmit={handleSubmit}>
+          {mode === 'register' && (
+            <>
+              <div className="form-group">
+                <label>Nombre completo</label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Ej: Jorge Pérez"
+                  required
+                  autoFocus
+                />
+              </div>
 
-          <label style={label}>CONTRASEÑA</label>
-          <input style={input} type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <div className="form-group">
+                <label>Tipo de cuenta</label>
+                <div className="role-toggle">
+                  <button
+                    type="button"
+                    className={`role-btn ${role === 'alumno' ? 'active' : ''}`}
+                    onClick={() => setRole('alumno')}
+                  >
+                    🏋️ Alumno
+                  </button>
 
-          {errorMsg && (
-            <div style={{
-              background: 'rgba(239,68,68,0.15)',
-              border: '1px solid #ef4444',
-              color: '#f87171',
-              padding: 14,
-              borderRadius: 12,
-              marginBottom: 18
-            }}>
-              {errorMsg}
-            </div>
+                  <button
+                    type="button"
+                    className={`role-btn ${role === 'profe' ? 'active' : ''}`}
+                    onClick={() => setRole('profe')}
+                  >
+                    📋 Profesor
+                  </button>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Código de academia</label>
+                <input
+                  type="text"
+                  value={academyCode}
+                  onChange={(e) => setAcademyCode(e.target.value.toUpperCase())}
+                  placeholder="Ej: ASD123"
+                  required
+                />
+                <small className="helper-text">Este código lo entrega el coach o administrador.</small>
+              </div>
+            </>
           )}
 
-          <button type="submit" disabled={loading} style={button}>
-            {loading ? 'INGRESANDO...' : 'ENTRAR'}
+          <div className="form-group">
+            <label>Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="tu@email.com"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Contraseña</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+              minLength={6}
+            />
+          </div>
+
+          {error && <div className="alert-error">{error}</div>}
+          {ok && <div className="alert-ok">{ok}</div>}
+
+          <button type="submit" className="btn-login" disabled={loading}>
+            {loading ? 'CARGANDO...' : mode === 'login' ? 'ENTRAR' : 'CREAR CUENTA'}
           </button>
         </form>
-      </section>
-    </main>
+      </div>
+
+      <div className="login-footer">Trial gratis de 14 días · Sin tarjeta requerida</div>
+    </div>
   )
-}
-
-const label = {
-  display: 'block',
-  color: '#888',
-  letterSpacing: 5,
-  fontSize: 13,
-  marginBottom: 10,
-  marginTop: 18
-}
-
-const input = {
-  width: '100%',
-  background: '#111',
-  border: '1px solid #2f2f2f',
-  color: '#fff',
-  borderRadius: 14,
-  padding: 18,
-  fontSize: 16,
-  marginBottom: 12,
-  outline: 'none',
-  boxSizing: 'border-box' as const
-}
-
-const button = {
-  width: '100%',
-  background: '#c6ff32',
-  color: '#000',
-  border: 'none',
-  borderRadius: 14,
-  padding: 18,
-  fontSize: 18,
-  fontWeight: 900,
-  letterSpacing: 3,
-  cursor: 'pointer'
 }
