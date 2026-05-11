@@ -17,8 +17,9 @@ export default async function DashboardPage() {
     .maybeSingle()
 
   if (profile?.role === 'super_admin') redirect('/dashboard/admin')
+  if (profile?.role === 'admin') redirect('/dashboard/admin')
   if (profile?.role === 'profe') redirect('/dashboard/profe')
   if (profile?.role === 'alumno') redirect('/dashboard/alumno')
 
-  redirect('/login')
+  redirect('/dashboard/alumno')
 }

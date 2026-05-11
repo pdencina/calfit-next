@@ -14,9 +14,7 @@ export default async function DashboardLayout({
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) {
-    redirect('/login')
-  }
+  if (!user) redirect('/login')
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -24,13 +22,17 @@ export default async function DashboardLayout({
     .eq('id', user.id)
     .maybeSingle()
 
-  if (!profile) {
-    redirect('/login')
+  const safeProfile = profile ?? {
+    id: user.id,
+    email: user.email,
+    full_name: user.email?.split('@')[0] ?? 'Usuario',
+    role: 'alumno',
+    academia_id: null,
   }
 
   return (
     <div className="app-shell">
-      <Sidebar profile={profile} />
+      <Sidebar profile={safeProfile} />
 
       <main className="main-content">
         {children}
