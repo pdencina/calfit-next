@@ -2,10 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
   const router = useRouter()
 
   const [email, setEmail] = useState('')
@@ -19,13 +19,10 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
-
-    console.log('LOGIN RESPONSE:', data)
-    console.log('LOGIN ERROR:', error)
 
     if (error) {
       setError(error.message)
@@ -38,49 +35,62 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <form
-        onSubmit={handleLogin}
-        className="bg-zinc-900 p-10 rounded-3xl w-full max-w-md"
-      >
-        <h1 className="text-5xl font-bold text-lime-400 mb-8">
-          CALFIT
-        </h1>
+    <div className="min-h-screen bg-black flex items-center justify-center px-4">
+      <div className="w-full max-w-md bg-zinc-900 rounded-3xl p-8 border border-zinc-800">
+        <div className="mb-10 text-center">
+          <h1 className="text-6xl font-black tracking-widest text-lime-400">
+            CALFIT
+          </h1>
 
-        <div className="mb-4">
-          <input
-            type="email"
-            placeholder="Email"
-            className="w-full p-4 rounded-xl bg-zinc-800 text-white"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
+          <p className="text-zinc-500 mt-4 tracking-[0.3em] text-sm">
+            PLATAFORMA PRO
+          </p>
         </div>
 
-        <div className="mb-4">
-          <input
-            type="password"
-            placeholder="Contraseña"
-            className="w-full p-4 rounded-xl bg-zinc-800 text-white"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </div>
+        <form onSubmit={handleLogin} className="space-y-5">
+          <div>
+            <label className="block text-zinc-400 text-sm mb-2">
+              EMAIL
+            </label>
 
-        {error && (
-          <div className="mb-4 text-red-500">
-            {error}
+            <input
+              type="email"
+              placeholder="correo@gmail.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-4 text-white outline-none focus:border-lime-400"
+            />
           </div>
-        )}
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-lime-400 text-black font-bold p-4 rounded-xl"
-        >
-          {loading ? 'Ingresando...' : 'Entrar'}
-        </button>
-      </form>
+          <div>
+            <label className="block text-zinc-400 text-sm mb-2">
+              CONTRASEÑA
+            </label>
+
+            <input
+              type="password"
+              placeholder="********"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-4 text-white outline-none focus:border-lime-400"
+            />
+          </div>
+
+          {error && (
+            <div className="bg-red-500/10 border border-red-500 text-red-400 rounded-xl p-4 text-sm">
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-lime-400 hover:bg-lime-300 transition-all text-black font-black tracking-widest rounded-xl py-4"
+          >
+            {loading ? 'INGRESANDO...' : 'ENTRAR'}
+          </button>
+        </form>
+      </div>
     </div>
   )
 }
