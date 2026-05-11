@@ -1,114 +1,86 @@
 'use client'
+
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import './login.css'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 export default function LoginPage() {
-  const router   = useRouter()
-  const [mode, setMode]         = useState<'login'|'register'>('login')
-  const [role, setRole]         = useState<'profe'|'alumno'>('profe')
-  const [email, setEmail]       = useState('')
+  const supabase = createClientComponentClient()
+  const router = useRouter()
+
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [fullName, setFullName] = useState('')
-  const [loading, setLoading]   = useState(false)
-  const [error, setError]       = useState('')
-  const [ok, setOk]             = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  async function handleSubmit(e: React.FormEvent) {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(''); setOk(''); setLoading(true)
-    const supabase = createClient()
 
-    try {
-      if (mode === 'login') {
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) throw error
-        router.push('/dashboard')
-        router.refresh()
-      } else {
-        const { error } = await supabase.auth.signUp({
-          email, password,
-          options: { data: { full_name: fullName, role } }
-        })
-        if (error) throw error
-        setOk('¡Cuenta creada! Revisá tu email si necesitás confirmar.')
-        setMode('login')
-      }
-    } catch (err: any) {
-      setError(err.message || 'Error desconocido')
-    } finally {
+    setLoading(true)
+    setError('')
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    console.log('LOGIN RESPONSE:', data)
+    console.log('LOGIN ERROR:', error)
+
+    if (error) {
+      setError(error.message)
       setLoading(false)
+      return
     }
+
+    router.push('/dashboard')
+    router.refresh()
   }
 
   return (
-    <div className="login-page">
-      <div className="login-bg" />
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <form
+        onSubmit={handleLogin}
+        className="bg-zinc-900 p-10 rounded-3xl w-full max-w-md"
+      >
+        <h1 className="text-5xl font-bold text-lime-400 mb-8">
+          CALFIT
+        </h1>
 
-      <div className="login-brand">CALFIT</div>
-      <div className="login-sub">PLATAFORMA PRO</div>
-
-      <div className="login-box">
-        {/* Tabs */}
-        <div className="login-tabs">
-          {(['login', 'register'] as const).map(m => (
-            <button
-              key={m}
-              className={`login-tab ${mode === m ? 'active' : ''}`}
-              onClick={() => { setMode(m); setError('') }}
-              type="button"
-            >
-              {m === 'login' ? 'Ingresar' : 'Registrarse'}
-            </button>
-          ))}
+        <div className="mb-4">
+          <input
+            type="email"
+            placeholder="Email"
+            className="w-full p-4 rounded-xl bg-zinc-800 text-white"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
         </div>
 
-        <form onSubmit={handleSubmit}>
-          {mode === 'register' && (
-            <>
-              <div className="form-group">
-                <label>Nombre completo</label>
-                <input type="text" value={fullName} onChange={e => setFullName(e.target.value)}
-                  placeholder="Carlos García" required autoFocus />
-              </div>
-              <div className="form-group">
-                <label>Tipo de cuenta</label>
-                <div className="role-toggle">
-                  {[{v:'profe',l:'📋 Profesor'},{v:'alumno',l:'🏋️ Alumno'}].map(({v,l}) => (
-                    <button key={v} type="button"
-                      className={`role-btn ${role === v ? 'active' : ''}`}
-                      onClick={() => setRole(v as 'profe'|'alumno')}>
-                      {l}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
+        <div className="mb-4">
+          <input
+            type="password"
+            placeholder="Contraseña"
+            className="w-full p-4 rounded-xl bg-zinc-800 text-white"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
 
-          <div className="form-group">
-            <label>Email</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-              placeholder="tu@email.com" required />
+        {error && (
+          <div className="mb-4 text-red-500">
+            {error}
           </div>
+        )}
 
-          <div className="form-group">
-            <label>Contraseña</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-              placeholder="••••••••" required minLength={6} />
-          </div>
-
-          {error && <div className="alert-error">{error}</div>}
-          {ok    && <div className="alert-ok">{ok}</div>}
-
-          <button type="submit" className="btn-login" disabled={loading}>
-            {loading ? 'CARGANDO...' : mode === 'login' ? 'ENTRAR' : 'CREAR CUENTA'}
-          </button>
-        </form>
-      </div>
-
-      <div className="login-footer">Trial gratis de 14 días · Sin tarjeta requerida</div>
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-lime-400 text-black font-bold p-4 rounded-xl"
+        >
+          {loading ? 'Ingresando...' : 'Entrar'}
+        </button>
+      </form>
     </div>
   )
 }
