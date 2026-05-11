@@ -1,36 +1,41 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
   const supabase = createClient()
-  const router = useRouter()
-
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState('encinaacevedo.pablo@gmail.com')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setError('')
+    setErrorMsg('')
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      })
 
-    if (error) {
-      setError(error.message)
+      console.log('LOGIN DATA:', data)
+      console.log('LOGIN ERROR:', error)
+
+      if (error) {
+        setErrorMsg(error.message)
+        setLoading(false)
+        return
+      }
+
+      window.location.href = '/dashboard'
+    } catch (err: any) {
+      console.error('LOGIN CATCH:', err)
+      setErrorMsg(err?.message || 'Error inesperado al iniciar sesión')
       setLoading(false)
-      return
     }
-
-    router.push('/dashboard')
-    router.refresh()
   }
 
   return (
@@ -40,87 +45,48 @@ export default function LoginPage() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '24px',
+      padding: 24,
       fontFamily: 'Arial, sans-serif',
       color: '#fff'
     }}>
       <section style={{
         width: '100%',
-        maxWidth: '520px',
-        background: 'rgba(24,24,27,0.92)',
+        maxWidth: 520,
+        background: 'rgba(24,24,27,0.94)',
         border: '1px solid #2a2a2a',
-        borderRadius: '28px',
-        padding: '42px',
-        boxShadow: '0 30px 80px rgba(0,0,0,0.55)'
+        borderRadius: 28,
+        padding: 42
       }}>
-        <div style={{ textAlign: 'center', marginBottom: '36px' }}>
-          <h1 style={{
-            color: '#c6ff32',
-            fontSize: '64px',
-            letterSpacing: '12px',
-            margin: 0,
-            fontWeight: 900
-          }}>
+        <div style={{ textAlign: 'center', marginBottom: 36 }}>
+          <h1 style={{ color: '#c6ff32', fontSize: 64, letterSpacing: 12, margin: 0, fontWeight: 900 }}>
             CALFIT
           </h1>
-          <p style={{
-            color: '#777',
-            letterSpacing: '8px',
-            marginTop: '12px',
-            fontSize: '13px'
-          }}>
+          <p style={{ color: '#777', letterSpacing: 8, marginTop: 12, fontSize: 13 }}>
             PLATAFORMA PRO
           </p>
         </div>
 
         <form onSubmit={handleLogin}>
           <label style={label}>EMAIL</label>
-          <input
-            style={input}
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="correo@gmail.com"
-          />
+          <input style={input} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
 
           <label style={label}>CONTRASEÑA</label>
-          <input
-            style={input}
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="********"
-          />
+          <input style={input} type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
 
-          {error && (
+          {errorMsg && (
             <div style={{
               background: 'rgba(239,68,68,0.15)',
               border: '1px solid #ef4444',
               color: '#f87171',
-              padding: '14px',
-              borderRadius: '12px',
-              marginBottom: '18px'
+              padding: 14,
+              borderRadius: 12,
+              marginBottom: 18
             }}>
-              {error}
+              {errorMsg}
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: '100%',
-              background: '#c6ff32',
-              color: '#000',
-              border: 'none',
-              borderRadius: '14px',
-              padding: '18px',
-              fontSize: '18px',
-              fontWeight: 900,
-              letterSpacing: '3px',
-              cursor: 'pointer'
-            }}
-          >
+          <button type="submit" disabled={loading} style={button}>
             {loading ? 'INGRESANDO...' : 'ENTRAR'}
           </button>
         </form>
@@ -132,10 +98,10 @@ export default function LoginPage() {
 const label = {
   display: 'block',
   color: '#888',
-  letterSpacing: '5px',
-  fontSize: '13px',
-  marginBottom: '10px',
-  marginTop: '18px'
+  letterSpacing: 5,
+  fontSize: 13,
+  marginBottom: 10,
+  marginTop: 18
 }
 
 const input = {
@@ -143,10 +109,23 @@ const input = {
   background: '#111',
   border: '1px solid #2f2f2f',
   color: '#fff',
-  borderRadius: '14px',
-  padding: '18px',
-  fontSize: '16px',
-  marginBottom: '12px',
+  borderRadius: 14,
+  padding: 18,
+  fontSize: 16,
+  marginBottom: 12,
   outline: 'none',
   boxSizing: 'border-box' as const
+}
+
+const button = {
+  width: '100%',
+  background: '#c6ff32',
+  color: '#000',
+  border: 'none',
+  borderRadius: 14,
+  padding: 18,
+  fontSize: 18,
+  fontWeight: 900,
+  letterSpacing: 3,
+  cursor: 'pointer'
 }
