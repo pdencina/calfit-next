@@ -1,20 +1,26 @@
 import Sidebar from '@/components/layout/Sidebar'
 import './dashboard.css'
 
-export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default async function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   const safeProfile = {
-    id: 'demo',
+    id: 'super-admin-demo',
     email: 'encinaacevedo.pablo@gmail.com',
     full_name: 'Pablo Encina',
-    role: 'profe',
+    role: 'super_admin',
+    academia_id: null,
   }
 
   return (
     <div className="app-shell">
       <Sidebar profile={safeProfile} />
-      <div className="main-content">
+
+      <main className="main-content">
         {children}
-      </div>
+      </main>
     </div>
   )
 }
