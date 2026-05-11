@@ -15,7 +15,6 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-
     setLoading(true)
     setError('')
 
@@ -35,49 +34,73 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-zinc-900 rounded-3xl p-8 border border-zinc-800">
-        <div className="mb-10 text-center">
-          <h1 className="text-6xl font-black tracking-widest text-lime-400">
+    <main style={{
+      minHeight: '100vh',
+      background: 'radial-gradient(circle at top, #18210f 0%, #050505 45%, #000 100%)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '24px',
+      fontFamily: 'Arial, sans-serif',
+      color: '#fff'
+    }}>
+      <section style={{
+        width: '100%',
+        maxWidth: '520px',
+        background: 'rgba(24,24,27,0.92)',
+        border: '1px solid #2a2a2a',
+        borderRadius: '28px',
+        padding: '42px',
+        boxShadow: '0 30px 80px rgba(0,0,0,0.55)'
+      }}>
+        <div style={{ textAlign: 'center', marginBottom: '36px' }}>
+          <h1 style={{
+            color: '#c6ff32',
+            fontSize: '64px',
+            letterSpacing: '12px',
+            margin: 0,
+            fontWeight: 900
+          }}>
             CALFIT
           </h1>
-
-          <p className="text-zinc-500 mt-4 tracking-[0.3em] text-sm">
+          <p style={{
+            color: '#777',
+            letterSpacing: '8px',
+            marginTop: '12px',
+            fontSize: '13px'
+          }}>
             PLATAFORMA PRO
           </p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-5">
-          <div>
-            <label className="block text-zinc-400 text-sm mb-2">
-              EMAIL
-            </label>
+        <form onSubmit={handleLogin}>
+          <label style={label}>EMAIL</label>
+          <input
+            style={input}
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="correo@gmail.com"
+          />
 
-            <input
-              type="email"
-              placeholder="correo@gmail.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-4 text-white outline-none focus:border-lime-400"
-            />
-          </div>
-
-          <div>
-            <label className="block text-zinc-400 text-sm mb-2">
-              CONTRASEÑA
-            </label>
-
-            <input
-              type="password"
-              placeholder="********"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-4 text-white outline-none focus:border-lime-400"
-            />
-          </div>
+          <label style={label}>CONTRASEÑA</label>
+          <input
+            style={input}
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="********"
+          />
 
           {error && (
-            <div className="bg-red-500/10 border border-red-500 text-red-400 rounded-xl p-4 text-sm">
+            <div style={{
+              background: 'rgba(239,68,68,0.15)',
+              border: '1px solid #ef4444',
+              color: '#f87171',
+              padding: '14px',
+              borderRadius: '12px',
+              marginBottom: '18px'
+            }}>
               {error}
             </div>
           )}
@@ -85,12 +108,45 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-lime-400 hover:bg-lime-300 transition-all text-black font-black tracking-widest rounded-xl py-4"
+            style={{
+              width: '100%',
+              background: '#c6ff32',
+              color: '#000',
+              border: 'none',
+              borderRadius: '14px',
+              padding: '18px',
+              fontSize: '18px',
+              fontWeight: 900,
+              letterSpacing: '3px',
+              cursor: 'pointer'
+            }}
           >
             {loading ? 'INGRESANDO...' : 'ENTRAR'}
           </button>
         </form>
-      </div>
-    </div>
+      </section>
+    </main>
   )
+}
+
+const label = {
+  display: 'block',
+  color: '#888',
+  letterSpacing: '5px',
+  fontSize: '13px',
+  marginBottom: '10px',
+  marginTop: '18px'
+}
+
+const input = {
+  width: '100%',
+  background: '#111',
+  border: '1px solid #2f2f2f',
+  color: '#fff',
+  borderRadius: '14px',
+  padding: '18px',
+  fontSize: '16px',
+  marginBottom: '12px',
+  outline: 'none',
+  boxSizing: 'border-box' as const
 }
