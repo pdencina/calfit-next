@@ -81,6 +81,10 @@ export default function LoginPage() {
           <Link href="/register-coach" style={styles.registerButton}>
             EMPEZAR GRATIS
           </Link>
+
+          <Link href="/join-academy" style={styles.studentLink}>
+            Soy alumno y tengo código de invitación
+          </Link>
         </div>
       </div>
     </main>
@@ -194,5 +198,13 @@ const styles: Record<string, React.CSSProperties> = {
     textDecoration: 'none',
     fontWeight: 900,
     boxSizing: 'border-box',
+  },
+
+  studentLink: {
+    display: 'block',
+    marginTop: 14,
+    color: '#888',
+    textDecoration: 'none',
+    fontSize: 14,
   },
 }

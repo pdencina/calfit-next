@@ -4,27 +4,33 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-export default function RegisterCoachPage() {
+export default function JoinAcademyPage() {
   const router = useRouter()
   const supabase = createClient()
 
   const [fullName, setFullName] = useState('')
-  const [academyName, setAcademyName] = useState('')
+  const [academyCode, setAcademyCode] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  function generateCode() {
-    return `CALFIT-${Math.floor(1000 + Math.random() * 9000)}`
-  }
-
-  async function handleRegister(e: React.FormEvent) {
+  async function handleJoin(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
 
-    const academyCode = generateCode()
+    const { data: academy } = await supabase
+      .from('academias')
+      .select('id')
+      .eq('codigo', academyCode.trim().toUpperCase())
+      .maybeSingle()
+
+    if (!academy) {
+      setError('Código de invitación inválido. Pídeselo a tu coach.')
+      setLoading(false)
+      return
+    }
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
@@ -32,36 +38,19 @@ export default function RegisterCoachPage() {
     })
 
     if (authError || !authData.user) {
-      setError(authError?.message || 'No se pudo crear el usuario.')
+      setError(authError?.message || 'No se pudo crear tu cuenta.')
       setLoading(false)
       return
     }
 
     const user = authData.user
 
-    const { data: academy, error: academyError } = await supabase
-      .from('academias')
-      .insert({
-        name: academyName,
-        codigo: academyCode,
-        owner_id: user.id,
-      })
-      .select()
-      .single()
-
-    if (academyError) {
-      setError(academyError.message)
-      setLoading(false)
-      return
-    }
-
     const { error: profileError } = await supabase.from('profiles').upsert({
       id: user.id,
       full_name: fullName,
       email,
-      role: 'profe',
+      role: 'alumno',
       academia_id: academy.id,
-      plan: 'trial',
     })
 
     if (profileError) {
@@ -70,28 +59,28 @@ export default function RegisterCoachPage() {
       return
     }
 
-    router.push('/dashboard/profe')
+    router.push('/dashboard/alumno')
   }
 
   return (
     <main style={styles.page}>
       <div style={styles.card}>
         <h1 style={styles.logo}>CALFIT</h1>
-        <h2 style={styles.title}>Crea tu academia</h2>
+        <h2 style={styles.title}>Únete a tu academia</h2>
         <p style={styles.subtitle}>
-          Tu código de invitación se generará automáticamente.
+          Ingresa el código de invitación que te entregó tu coach.
         </p>
 
-        <form onSubmit={handleRegister}>
-          <input style={styles.input} placeholder="Tu nombre completo" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
-          <input style={styles.input} placeholder="Nombre de tu academia" value={academyName} onChange={(e) => setAcademyName(e.target.value)} required />
+        <form onSubmit={handleJoin}>
+          <input style={styles.input} placeholder="Nombre completo" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+          <input style={styles.input} placeholder="Código de invitación Ej: CALFIT-1234" value={academyCode} onChange={(e) => setAcademyCode(e.target.value.toUpperCase())} required />
           <input style={styles.input} type="email" placeholder="Correo" value={email} onChange={(e) => setEmail(e.target.value)} required />
           <input style={styles.input} type="password" placeholder="Contraseña" value={password} onChange={(e) => setPassword(e.target.value)} required />
 
           {error && <div style={styles.error}>{error}</div>}
 
           <button style={styles.button} disabled={loading}>
-            {loading ? 'CREANDO...' : 'CREAR MI ACADEMIA'}
+            {loading ? 'CREANDO...' : 'CREAR CUENTA DE ALUMNO'}
           </button>
         </form>
       </div>
@@ -125,7 +114,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   title: {
     textAlign: 'center',
-    fontSize: 36,
+    fontSize: 34,
   },
   subtitle: {
     textAlign: 'center',
