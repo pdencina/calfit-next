@@ -45,9 +45,8 @@ export default function ProfeDashboardPage() {
   const [sessions, setSessions] =
     useState<Session[]>([])
 
-  const [goals, setGoals] = useState<
-    Goal[]
-  >([])
+  const [goals, setGoals] =
+    useState<Goal[]>([])
 
   async function loadDashboard() {
     setLoading(true)
@@ -84,9 +83,6 @@ export default function ProfeDashboardPage() {
       await supabase
         .from('routines')
         .select('*')
-        .order('created_at', {
-          ascending: false,
-        })
 
     setRoutines(routineRows || [])
 
@@ -118,12 +114,6 @@ export default function ProfeDashboardPage() {
     sessions.filter((s) => s.completed)
       .length
 
-  const totalMinutes = sessions.reduce(
-    (acc, s) =>
-      acc + (s.duration_minutes || 0),
-    0
-  )
-
   const completedGoals =
     goals.filter((g) => g.completed)
       .length
@@ -150,7 +140,7 @@ export default function ProfeDashboardPage() {
 
   if (loading) {
     return (
-      <div style={styles.page}>
+      <div style={styles.loader}>
         Cargando dashboard...
       </div>
     )
@@ -158,6 +148,8 @@ export default function ProfeDashboardPage() {
 
   return (
     <div style={styles.page}>
+      {/* HERO */}
+
       <div style={styles.hero}>
         <div>
           <h1 style={styles.title}>
@@ -177,50 +169,56 @@ export default function ProfeDashboardPage() {
         </div>
       </div>
 
+      {/* STATS */}
+
       <div style={styles.statsGrid}>
         <StatCard
           value={students.length}
-          label="Alumnos activos"
+          label="Alumnos"
         />
 
         <StatCard
           value={routines.length}
-          label="Rutinas creadas"
+          label="Rutinas"
         />
 
         <StatCard
           value={completedSessions}
-          label="Sesiones completadas"
+          label="Sesiones"
         />
 
         <StatCard
           value={completedGoals}
-          label="Objetivos logrados"
+          label="Objetivos"
         />
       </div>
+
+      {/* ACTIONS */}
 
       <div style={styles.quickGrid}>
         <QuickCard
           href="/dashboard/profe/rutinas"
           emoji="📋"
           title="Rutinas"
-          text="Crea y asigna entrenamientos."
+          text="Gestiona entrenamientos"
         />
 
         <QuickCard
           href="/dashboard/profe/alumnos"
           emoji="👥"
           title="Alumnos"
-          text="Gestiona tu comunidad."
+          text="Tu comunidad"
         />
 
         <QuickCard
           href="/dashboard/profe/mensajes"
           emoji="💬"
           title="Mensajes"
-          text="Habla con tus alumnos."
+          text="Habla con alumnos"
         />
       </div>
+
+      {/* ACTIVITY */}
 
       <div style={styles.section}>
         <div style={styles.sectionTop}>
@@ -236,138 +234,36 @@ export default function ProfeDashboardPage() {
           </button>
         </div>
 
-        {sessions.length === 0 ? (
-          <div style={styles.empty}>
-            Aún no hay actividad.
-          </div>
-        ) : (
-          <div style={styles.activityList}>
-            {sessions
-              .slice(0, 8)
-              .map((session) => (
-                <div
-                  key={session.id}
-                  style={
-                    styles.activityCard
-                  }
-                >
-                  <div>
-                    <strong
-                      style={
-                        styles.activityTitle
-                      }
-                    >
-                      {session.completed
-                        ? '✅ Entrenamiento completado'
-                        : '⏳ Entrenamiento iniciado'}
-                    </strong>
+        <div style={styles.activityList}>
+          {sessions
+            .slice(0, 5)
+            .map((session) => (
+              <div
+                key={session.id}
+                style={styles.activityCard}
+              >
+                <div>
+                  <strong>
+                    {session.completed
+                      ? '✅ Completado'
+                      : '⏳ En progreso'}
+                  </strong>
 
-                    <p
-                      style={
-                        styles.activityDate
-                      }
-                    >
-                      {new Date(
-                        session.created_at
-                      ).toLocaleDateString(
-                        'es-CL'
-                      )}
-                    </p>
-                  </div>
-
-                  <div
-                    style={
-                      styles.badge
-                    }
-                  >
-                    ⏱️{' '}
-                    {
-                      session.duration_minutes
-                    }{' '}
-                    min
-                  </div>
+                  <p style={styles.activityDate}>
+                    {new Date(
+                      session.created_at
+                    ).toLocaleDateString(
+                      'es-CL'
+                    )}
+                  </p>
                 </div>
-              ))}
-          </div>
-        )}
-      </div>
 
-      <div style={styles.bottomGrid}>
-        <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>
-            Resumen rápido
-          </h2>
-
-          <div style={styles.summaryGrid}>
-            <SummaryItem
-              label="Minutos entrenados"
-              value={String(
-                totalMinutes
-              )}
-            />
-
-            <SummaryItem
-              label="Promedio por sesión"
-              value={
-                completedSessions > 0
-                  ? String(
-                      Math.round(
-                        totalMinutes /
-                          completedSessions
-                      )
-                    )
-                  : '0'
-              }
-            />
-
-            <SummaryItem
-              label="Objetivos activos"
-              value={String(
-                goals.length
-              )}
-            />
-
-            <SummaryItem
-              label="Nivel academia"
-              value="PRO"
-            />
-          </div>
-        </div>
-
-        <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>
-            Últimas rutinas
-          </h2>
-
-          {routines.length === 0 ? (
-            <div style={styles.empty}>
-              No hay rutinas.
-            </div>
-          ) : (
-            <div style={styles.routineList}>
-              {routines
-                .slice(0, 6)
-                .map((routine) => (
-                  <div
-                    key={routine.id}
-                    style={
-                      styles.routineCard
-                    }
-                  >
-                    <span
-                      style={
-                        styles.routineTitle
-                      }
-                    >
-                      💪{' '}
-                      {
-                        routine.titulo
-                      }
-                    </span>
-                  </div>
-                ))}
-            </div>
-          )}
+                <div style={styles.badge}>
+                  {session.duration_minutes}{' '}
+                  min
+                </div>
+              </div>
+            ))}
         </div>
       </div>
     </div>
@@ -383,13 +279,13 @@ function StatCard({
 }) {
   return (
     <div style={styles.statCard}>
-      <span style={styles.statNumber}>
+      <div style={styles.statNumber}>
         {value}
-      </span>
+      </div>
 
-      <span style={styles.statLabel}>
+      <div style={styles.statLabel}>
         {label}
-      </span>
+      </div>
     </div>
   )
 }
@@ -411,34 +307,14 @@ function QuickCard({
         {emoji}
       </div>
 
-      <h2 style={styles.quickTitle}>
+      <div style={styles.quickTitle}>
         {title}
-      </h2>
+      </div>
 
-      <p style={styles.quickText}>
+      <div style={styles.quickText}>
         {text}
-      </p>
+      </div>
     </Link>
-  )
-}
-
-function SummaryItem({
-  label,
-  value,
-}: {
-  label: string
-  value: string
-}) {
-  return (
-    <div style={styles.summaryItem}>
-      <strong style={styles.summaryValue}>
-        {value}
-      </strong>
-
-      <span style={styles.summaryLabel}>
-        {label}
-      </span>
-    </div>
   )
 }
 
@@ -446,112 +322,120 @@ const styles: Record<
   string,
   React.CSSProperties
 > = {
-  page: {
-    padding: 32,
+  loader: {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     color: '#fff',
+  },
+
+  page: {
+    padding: '90px 16px 120px',
+    color: '#fff',
+    maxWidth: 1400,
+    margin: '0 auto',
   },
 
   hero: {
     display: 'flex',
-    justifyContent:
-      'space-between',
-    alignItems: 'center',
+    flexDirection: 'column',
     gap: 20,
-    marginBottom: 30,
+    marginBottom: 28,
   },
 
   title: {
-    fontSize: 42,
-    margin: 0,
+    fontSize: 48,
     fontWeight: 900,
+    lineHeight: 1,
+    margin: 0,
   },
 
   subtitle: {
     color: '#8a8a8a',
-    marginTop: 10,
+    marginTop: 12,
+    lineHeight: 1.5,
+    fontSize: 16,
   },
 
   liveCard: {
     background:
-      'linear-gradient(135deg,#c8f542,#9eff00)',
+      'linear-gradient(135deg,#c8f542,#a7ff00)',
     color: '#000',
-    padding: '18px 24px',
-    borderRadius: 18,
+    borderRadius: 24,
+    padding: '18px 22px',
     fontWeight: 900,
     fontSize: 18,
-    whiteSpace: 'nowrap',
+    alignSelf: 'flex-start',
   },
 
   statsGrid: {
     display: 'grid',
     gridTemplateColumns:
-      'repeat(auto-fit,minmax(220px,1fr))',
-    gap: 20,
-    marginBottom: 30,
+      'repeat(auto-fit,minmax(160px,1fr))',
+    gap: 16,
+    marginBottom: 22,
   },
 
   statCard: {
     background: '#111',
+    borderRadius: 24,
+    padding: 22,
     border:
       '1px solid rgba(255,255,255,.06)',
-    borderRadius: 24,
-    padding: 24,
   },
 
   statNumber: {
     fontSize: 42,
-    color: '#c8f542',
     fontWeight: 900,
-    display: 'block',
+    color: '#c8f542',
   },
 
   statLabel: {
-    color: '#8a8a8a',
+    color: '#777',
     marginTop: 10,
-    display: 'block',
   },
 
   quickGrid: {
     display: 'grid',
     gridTemplateColumns:
-      'repeat(auto-fit,minmax(240px,1fr))',
-    gap: 20,
-    marginBottom: 30,
+      'repeat(auto-fit,minmax(220px,1fr))',
+    gap: 16,
+    marginBottom: 24,
   },
 
   quickCard: {
-    display: 'block',
     background: '#111',
-    border:
-      '1px solid rgba(255,255,255,.06)',
     borderRadius: 24,
     padding: 24,
     textDecoration: 'none',
+    border:
+      '1px solid rgba(255,255,255,.06)',
     color: '#fff',
   },
 
   quickEmoji: {
-    fontSize: 42,
+    fontSize: 34,
     marginBottom: 14,
   },
 
   quickTitle: {
     color: '#c8f542',
+    fontWeight: 800,
+    fontSize: 24,
     marginBottom: 10,
   },
 
   quickText: {
-    color: '#8a8a8a',
-    lineHeight: 1.5,
+    color: '#777',
   },
 
   section: {
     background: '#111',
+    borderRadius: 24,
+    padding: 20,
     border:
       '1px solid rgba(255,255,255,.06)',
-    borderRadius: 24,
-    padding: 24,
-    marginBottom: 24,
   },
 
   sectionTop: {
@@ -560,27 +444,22 @@ const styles: Record<
       'space-between',
     alignItems: 'center',
     marginBottom: 20,
-    gap: 20,
+    gap: 12,
+    flexWrap: 'wrap',
   },
 
   sectionTitle: {
-    margin: 0,
     fontSize: 28,
+    margin: 0,
   },
 
   refresh: {
-    border:
-      '1px solid rgba(200,245,66,.4)',
     background: 'transparent',
+    border:
+      '1px solid rgba(200,245,66,.3)',
     color: '#c8f542',
-    padding: '10px 14px',
-    borderRadius: 12,
-    cursor: 'pointer',
-  },
-
-  empty: {
-    color: '#8a8a8a',
-    padding: 20,
+    borderRadius: 14,
+    padding: '10px 16px',
   },
 
   activityList: {
@@ -590,84 +469,30 @@ const styles: Record<
 
   activityCard: {
     background: '#0a0a0a',
-    border:
-      '1px solid rgba(255,255,255,.06)',
     borderRadius: 18,
-    padding: 18,
+    padding: 16,
+    border:
+      '1px solid rgba(255,255,255,.05)',
     display: 'flex',
     justifyContent:
       'space-between',
     alignItems: 'center',
-    gap: 20,
-  },
-
-  activityTitle: {
-    color: '#fff',
+    gap: 12,
   },
 
   activityDate: {
-    color: '#8a8a8a',
+    color: '#666',
     marginTop: 8,
+    fontSize: 13,
   },
 
   badge: {
     background: '#1b1b1b',
     color: '#c8f542',
-    padding: '10px 14px',
     borderRadius: 14,
+    padding: '8px 12px',
     fontWeight: 800,
+    fontSize: 13,
     whiteSpace: 'nowrap',
-  },
-
-  bottomGrid: {
-    display: 'grid',
-    gridTemplateColumns:
-      '1fr 1fr',
-    gap: 24,
-  },
-
-  summaryGrid: {
-    display: 'grid',
-    gridTemplateColumns:
-      'repeat(2,1fr)',
-    gap: 14,
-  },
-
-  summaryItem: {
-    background: '#0a0a0a',
-    border:
-      '1px solid rgba(255,255,255,.06)',
-    borderRadius: 18,
-    padding: 18,
-  },
-
-  summaryValue: {
-    display: 'block',
-    color: '#c8f542',
-    fontSize: 32,
-  },
-
-  summaryLabel: {
-    color: '#8a8a8a',
-    marginTop: 8,
-    display: 'block',
-  },
-
-  routineList: {
-    display: 'grid',
-    gap: 12,
-  },
-
-  routineCard: {
-    background: '#0a0a0a',
-    border:
-      '1px solid rgba(255,255,255,.06)',
-    borderRadius: 16,
-    padding: 16,
-  },
-
-  routineTitle: {
-    color: '#fff',
-    fontWeight: 700,
   },
 }
