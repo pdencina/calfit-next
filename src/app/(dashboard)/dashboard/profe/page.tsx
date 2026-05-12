@@ -158,14 +158,12 @@ export default function ProfeDashboardPage() {
 
           <p style={styles.subtitle}>
             Administra tus alumnos y
-            monitorea el progreso de tu
-            academia.
+            monitorea tu academia.
           </p>
         </div>
 
         <div style={styles.liveCard}>
           🔥 {sessionsThisWeek} sesiones
-          esta semana
         </div>
       </div>
 
@@ -200,21 +198,18 @@ export default function ProfeDashboardPage() {
           href="/dashboard/profe/rutinas"
           emoji="📋"
           title="Rutinas"
-          text="Gestiona entrenamientos"
         />
 
         <QuickCard
           href="/dashboard/profe/alumnos"
           emoji="👥"
           title="Alumnos"
-          text="Tu comunidad"
         />
 
         <QuickCard
           href="/dashboard/profe/mensajes"
           emoji="💬"
           title="Mensajes"
-          text="Habla con alumnos"
         />
       </div>
 
@@ -223,7 +218,7 @@ export default function ProfeDashboardPage() {
       <div style={styles.section}>
         <div style={styles.sectionTop}>
           <h2 style={styles.sectionTitle}>
-            Actividad reciente
+            Actividad
           </h2>
 
           <button
@@ -246,7 +241,7 @@ export default function ProfeDashboardPage() {
                   <strong>
                     {session.completed
                       ? '✅ Completado'
-                      : '⏳ En progreso'}
+                      : '⏳ Progreso'}
                   </strong>
 
                   <p style={styles.activityDate}>
@@ -259,8 +254,8 @@ export default function ProfeDashboardPage() {
                 </div>
 
                 <div style={styles.badge}>
-                  {session.duration_minutes}{' '}
-                  min
+                  {session.duration_minutes}
+                  m
                 </div>
               </div>
             ))}
@@ -294,12 +289,10 @@ function QuickCard({
   href,
   emoji,
   title,
-  text,
 }: {
   href: string
   emoji: string
   title: string
-  text: string
 }) {
   return (
     <Link href={href} style={styles.quickCard}>
@@ -309,10 +302,6 @@ function QuickCard({
 
       <div style={styles.quickTitle}>
         {title}
-      </div>
-
-      <div style={styles.quickText}>
-        {text}
       </div>
     </Link>
   )
@@ -331,21 +320,20 @@ const styles: Record<
   },
 
   page: {
-    padding: '90px 16px 120px',
+    padding: '24px 16px 120px',
     color: '#fff',
-    maxWidth: 1400,
-    margin: '0 auto',
+    width: '100%',
   },
 
   hero: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 20,
-    marginBottom: 28,
+    gap: 14,
+    marginBottom: 22,
   },
 
   title: {
-    fontSize: 48,
+    fontSize: 42,
     fontWeight: 900,
     lineHeight: 1,
     margin: 0,
@@ -353,87 +341,84 @@ const styles: Record<
 
   subtitle: {
     color: '#8a8a8a',
-    marginTop: 12,
-    lineHeight: 1.5,
-    fontSize: 16,
+    marginTop: 8,
+    lineHeight: 1.4,
+    fontSize: 15,
   },
 
   liveCard: {
     background:
-      'linear-gradient(135deg,#c8f542,#a7ff00)',
+      'linear-gradient(135deg,#c8f542,#b7ff00)',
     color: '#000',
-    borderRadius: 24,
-    padding: '18px 22px',
+    borderRadius: 18,
+    padding: '14px 18px',
     fontWeight: 900,
-    fontSize: 18,
+    fontSize: 15,
     alignSelf: 'flex-start',
   },
 
   statsGrid: {
     display: 'grid',
     gridTemplateColumns:
-      'repeat(auto-fit,minmax(160px,1fr))',
-    gap: 16,
-    marginBottom: 22,
+      'repeat(2,1fr)',
+    gap: 12,
+    marginBottom: 18,
   },
 
   statCard: {
     background: '#111',
-    borderRadius: 24,
-    padding: 22,
+    borderRadius: 20,
+    padding: 18,
     border:
       '1px solid rgba(255,255,255,.06)',
   },
 
   statNumber: {
-    fontSize: 42,
+    fontSize: 34,
     fontWeight: 900,
     color: '#c8f542',
   },
 
   statLabel: {
     color: '#777',
-    marginTop: 10,
+    marginTop: 6,
+    fontSize: 13,
   },
 
   quickGrid: {
     display: 'grid',
     gridTemplateColumns:
-      'repeat(auto-fit,minmax(220px,1fr))',
-    gap: 16,
-    marginBottom: 24,
+      'repeat(3,1fr)',
+    gap: 12,
+    marginBottom: 20,
   },
 
   quickCard: {
     background: '#111',
-    borderRadius: 24,
-    padding: 24,
+    borderRadius: 20,
+    padding: 18,
     textDecoration: 'none',
     border:
       '1px solid rgba(255,255,255,.06)',
     color: '#fff',
+    textAlign: 'center',
   },
 
   quickEmoji: {
-    fontSize: 34,
-    marginBottom: 14,
+    fontSize: 26,
+    marginBottom: 10,
   },
 
   quickTitle: {
     color: '#c8f542',
-    fontWeight: 800,
-    fontSize: 24,
-    marginBottom: 10,
-  },
-
-  quickText: {
-    color: '#777',
+    fontWeight: 700,
+    fontSize: 15,
   },
 
   section: {
     background: '#111',
-    borderRadius: 24,
-    padding: 20,
+    borderRadius: 22,
+    padding: 18,
     border:
       '1px solid rgba(255,255,255,.06)',
   },
@@ -443,56 +428,55 @@ const styles: Record<
     justifyContent:
       'space-between',
     alignItems: 'center',
-    marginBottom: 20,
-    gap: 12,
-    flexWrap: 'wrap',
+    marginBottom: 18,
   },
 
   sectionTitle: {
-    fontSize: 28,
+    fontSize: 22,
     margin: 0,
   },
 
   refresh: {
     background: 'transparent',
     border:
-      '1px solid rgba(200,245,66,.3)',
+      '1px solid rgba(200,245,66,.25)',
     color: '#c8f542',
-    borderRadius: 14,
-    padding: '10px 16px',
+    borderRadius: 12,
+    padding: '8px 12px',
+    fontSize: 12,
   },
 
   activityList: {
     display: 'grid',
-    gap: 14,
+    gap: 10,
   },
 
   activityCard: {
-    background: '#0a0a0a',
-    borderRadius: 18,
-    padding: 16,
+    background: '#0b0b0b',
+    borderRadius: 16,
+    padding: 14,
     border:
-      '1px solid rgba(255,255,255,.05)',
+      '1px solid rgba(255,255,255,.04)',
     display: 'flex',
     justifyContent:
       'space-between',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
 
   activityDate: {
     color: '#666',
-    marginTop: 8,
-    fontSize: 13,
+    marginTop: 6,
+    fontSize: 12,
   },
 
   badge: {
     background: '#1b1b1b',
     color: '#c8f542',
-    borderRadius: 14,
-    padding: '8px 12px',
+    borderRadius: 12,
+    padding: '7px 10px',
     fontWeight: 800,
-    fontSize: 13,
+    fontSize: 12,
     whiteSpace: 'nowrap',
   },
 }
