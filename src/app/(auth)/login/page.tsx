@@ -1,22 +1,15 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
   const supabase = createClient()
 
-  const [isRegister, setIsRegister] = useState(false)
-
-  const [fullName, setFullName] = useState('')
-  const [role, setRole] = useState('alumno')
-  const [academyCode, setAcademyCode] = useState('')
-
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-
   const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
   async function handleSubmit(e: React.FormEvent) {
@@ -24,72 +17,19 @@ export default function LoginPage() {
 
     setLoading(true)
     setError('')
-    setMessage('')
 
-    try {
-      if (isRegister) {
-        const { data: academy } = await supabase
-          .from('academias')
-          .select('id')
-          .eq('codigo', academyCode)
-          .maybeSingle()
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
 
-        if (!academy) {
-          setError('Código de academia inválido')
-          setLoading(false)
-          return
-        }
-
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: fullName,
-              role,
-              academia_id: academy.id,
-            },
-          },
-        })
-
-        if (error) {
-          setError(error.message)
-          setLoading(false)
-          return
-        }
-
-        if (data.user) {
-          await supabase.from('profiles').upsert({
-            id: data.user.id,
-            email,
-            full_name: fullName,
-            role,
-            academia_id: academy.id,
-          })
-        }
-
-        setMessage('Cuenta creada correctamente')
-        setLoading(false)
-        return
-      }
-
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (error) {
-        setError(error.message)
-        setLoading(false)
-        return
-      }
-
-      window.location.href = '/dashboard'
-    } catch (err: any) {
-      setError(err.message || 'Error inesperado')
+    if (error) {
+      setError(error.message)
+      setLoading(false)
+      return
     }
 
-    setLoading(false)
+    window.location.href = '/dashboard'
   }
 
   return (
@@ -99,64 +39,20 @@ export default function LoginPage() {
 
         <p style={styles.subtitle}>PLATAFORMA PRO</p>
 
-        <div style={styles.tabs}>
-          <button
-            style={{
-              ...styles.tab,
-              borderBottom: !isRegister ? '2px solid #c6ff32' : 'none',
-              color: !isRegister ? '#c6ff32' : '#777',
-            }}
-            onClick={() => setIsRegister(false)}
-          >
-            INGRESAR
-          </button>
+        <h2 style={styles.title}>Ingresar</h2>
 
-          <button
-            style={{
-              ...styles.tab,
-              borderBottom: isRegister ? '2px solid #c6ff32' : 'none',
-              color: isRegister ? '#c6ff32' : '#777',
-            }}
-            onClick={() => setIsRegister(true)}
-          >
-            REGISTRARSE
-          </button>
-        </div>
+        <p style={styles.description}>
+          Accede a tu panel de coach o alumno.
+        </p>
 
         <form onSubmit={handleSubmit}>
-          {isRegister && (
-            <>
-              <input
-                style={styles.input}
-                placeholder="Nombre completo"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-              />
-
-              <select
-                style={styles.input}
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-              >
-                <option value="alumno">Alumno</option>
-                <option value="profe">Profesor</option>
-              </select>
-
-              <input
-                style={styles.input}
-                placeholder="Código academia"
-                value={academyCode}
-                onChange={(e) => setAcademyCode(e.target.value)}
-              />
-            </>
-          )}
-
           <input
             style={styles.input}
-            placeholder="Email"
+            placeholder="Correo"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            required
           />
 
           <input
@@ -165,34 +61,33 @@ export default function LoginPage() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            required
           />
 
-          {error && (
-            <div style={styles.error}>
-              {error}
-            </div>
-          )}
+          {error && <div style={styles.error}>{error}</div>}
 
-          {message && (
-            <div style={styles.success}>
-              {message}
-            </div>
-          )}
-
-          <button style={styles.button}>
-            {loading
-              ? 'CARGANDO...'
-              : isRegister
-              ? 'CREAR CUENTA'
-              : 'ENTRAR'}
+          <button style={styles.button} disabled={loading}>
+            {loading ? 'INGRESANDO...' : 'ENTRAR'}
           </button>
         </form>
+
+        <div style={styles.divider} />
+
+        <div style={styles.registerBox}>
+          <p style={styles.registerText}>
+            ¿Eres coach y quieres crear tu academia?
+          </p>
+
+          <Link href="/register-coach" style={styles.registerButton}>
+            EMPEZAR GRATIS
+          </Link>
+        </div>
       </div>
     </main>
   )
 }
 
-const styles: any = {
+const styles: Record<string, React.CSSProperties> = {
   main: {
     minHeight: '100vh',
     background: '#000',
@@ -201,51 +96,53 @@ const styles: any = {
     alignItems: 'center',
     color: '#fff',
     fontFamily: 'Arial',
+    padding: 20,
   },
 
   card: {
     width: '100%',
-    maxWidth: '520px',
+    maxWidth: 520,
     background: '#111',
-    padding: '40px',
-    borderRadius: '24px',
+    padding: 42,
+    borderRadius: 28,
+    border: '1px solid rgba(255,255,255,.06)',
   },
 
   logo: {
     color: '#c6ff32',
-    fontSize: '64px',
+    fontSize: 64,
     fontWeight: 900,
-    letterSpacing: '10px',
+    letterSpacing: 10,
     textAlign: 'center',
-    marginBottom: '10px',
+    marginBottom: 10,
   },
 
   subtitle: {
     textAlign: 'center',
     color: '#666',
-    letterSpacing: '6px',
-    marginBottom: '30px',
+    letterSpacing: 6,
+    marginBottom: 34,
   },
 
-  tabs: {
-    display: 'flex',
-    marginBottom: '24px',
+  title: {
+    color: '#fff',
+    fontSize: 30,
+    margin: 0,
+    marginBottom: 8,
+    textAlign: 'center',
   },
 
-  tab: {
-    flex: 1,
-    background: 'transparent',
-    border: 'none',
-    padding: '16px',
-    cursor: 'pointer',
-    fontWeight: 700,
+  description: {
+    color: '#777',
+    textAlign: 'center',
+    marginBottom: 28,
   },
 
   input: {
     width: '100%',
-    padding: '16px',
-    marginBottom: '14px',
-    borderRadius: '12px',
+    padding: 16,
+    marginBottom: 14,
+    borderRadius: 14,
     border: '1px solid #333',
     background: '#000',
     color: '#fff',
@@ -254,29 +151,48 @@ const styles: any = {
 
   button: {
     width: '100%',
-    padding: '18px',
-    borderRadius: '14px',
+    padding: 18,
+    borderRadius: 14,
     border: 'none',
     background: '#c6ff32',
     color: '#000',
     fontWeight: 900,
-    marginTop: '12px',
+    marginTop: 12,
     cursor: 'pointer',
   },
 
   error: {
     background: '#3b0b0b',
     color: '#ff7b7b',
-    padding: '12px',
-    borderRadius: '12px',
-    marginBottom: '12px',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 12,
   },
 
-  success: {
-    background: '#0b3b16',
-    color: '#72ff9c',
-    padding: '12px',
-    borderRadius: '12px',
-    marginBottom: '12px',
+  divider: {
+    height: 1,
+    background: 'rgba(255,255,255,.08)',
+    margin: '28px 0',
+  },
+
+  registerBox: {
+    textAlign: 'center',
+  },
+
+  registerText: {
+    color: '#777',
+    marginBottom: 14,
+  },
+
+  registerButton: {
+    display: 'block',
+    width: '100%',
+    padding: 16,
+    borderRadius: 14,
+    border: '1px solid rgba(198,255,50,.45)',
+    color: '#c6ff32',
+    textDecoration: 'none',
+    fontWeight: 900,
+    boxSizing: 'border-box',
   },
 }
