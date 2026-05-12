@@ -27,7 +27,7 @@ export default function DashboardShell({
         onClick={() => setOpen(false)}
       />
 
-      <aside className={`sidebar-wrapper ${open ? 'open' : ''}`}>
+      <aside className={`sidebar-mobile ${open ? 'open' : ''}`}>
         <button
           className="mobile-close-button"
           onClick={() => setOpen(false)}
@@ -41,9 +41,11 @@ export default function DashboardShell({
         </div>
       </aside>
 
-      <main className="main-content">
-        {children}
-      </main>
+      <aside className="sidebar-desktop">
+        <Sidebar profile={profile} />
+      </aside>
+
+      <main className="main-content">{children}</main>
     </div>
   )
 }
