@@ -254,3 +254,9 @@ body {
   background: #000;
   color: #fff;
 }
+
+@media (min-width: 769px)
+  nav[style] {
+    display: none !important;
+  }
+}
