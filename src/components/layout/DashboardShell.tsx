@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Sidebar from '@/components/layout/Sidebar'
+import MobileBottomNav from '@/components/layout/MobileBottomNav'
 
 export default function DashboardShell({
   profile,
@@ -13,39 +14,32 @@ export default function DashboardShell({
   const [open, setOpen] = useState(false)
 
   return (
-    <div className="app-shell">
-      <button
-        className="mobile-menu-button"
-        onClick={() => setOpen(true)}
-        aria-label="Abrir menú"
-      >
-        ☰
-      </button>
-
-      <div
-        className={`sidebar-mobile-overlay ${open ? 'show' : ''}`}
-        onClick={() => setOpen(false)}
-      />
-
-      <aside className={`sidebar-mobile ${open ? 'open' : ''}`}>
-        <button
-          className="mobile-close-button"
-          onClick={() => setOpen(false)}
-          aria-label="Cerrar menú"
-        >
-          ×
-        </button>
-
-        <div onClick={() => setOpen(false)}>
-          <Sidebar profile={profile} />
-        </div>
-      </aside>
-
-      <aside className="sidebar-desktop">
+    <div className="calfit-shell">
+      <aside className="desktop-sidebar">
         <Sidebar profile={profile} />
       </aside>
 
-      <main className="main-content">{children}</main>
+      <header className="mobile-header">
+        <button className="hamburger" onClick={() => setOpen(true)}>
+          ☰
+        </button>
+        <span>CALFIT</span>
+      </header>
+
+      {open && (
+        <div className="mobile-overlay" onClick={() => setOpen(false)} />
+      )}
+
+      <aside className={`mobile-sidebar ${open ? 'open' : ''}`}>
+        <button className="close-menu" onClick={() => setOpen(false)}>
+          ×
+        </button>
+        <Sidebar profile={profile} />
+      </aside>
+
+      <main className="calfit-main">{children}</main>
+
+      <MobileBottomNav role={profile.role || 'alumno'} />
     </div>
   )
 }

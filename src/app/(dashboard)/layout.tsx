@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import DashboardShell from '@/components/layout/DashboardShell'
 import './dashboard.css'
-import MobileBottomNav from '@/components/layout/MobileBottomNav'
 
 export default async function DashboardLayout({
   children,
@@ -27,14 +26,7 @@ export default async function DashboardLayout({
 
   if (!profile) {
     return (
-      <div
-        style={{
-          padding: 40,
-          color: 'white',
-          background: '#000',
-          minHeight: '100vh',
-        }}
-      >
+      <div className="auth-error">
         <h1>Usuario autenticado, pero sin perfil</h1>
         <p>{user.email}</p>
       </div>

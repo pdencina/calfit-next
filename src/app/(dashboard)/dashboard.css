@@ -1,21 +1,230 @@
-@media (max-width: 768px) {
-  .app-shell {
-    flex-direction: column;
-  }
+html,
+body {
+  margin: 0;
+  background: #000;
+  color: #fff;
+  overflow-x: hidden;
+}
 
-  .sidebar {
+* {
+  box-sizing: border-box;
+}
+
+.auth-error {
+  min-height: 100vh;
+  background: #000;
+  color: #fff;
+  padding: 40px;
+}
+
+.calfit-shell {
+  min-height: 100vh;
+  background: #000;
+}
+
+.desktop-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: 240px;
+  background: #0b0b0b;
+  border-right: 1px solid rgba(255,255,255,.06);
+  z-index: 100;
+}
+
+.calfit-main {
+  margin-left: 240px;
+  min-height: 100vh;
+  padding: 40px;
+}
+
+.mobile-header,
+.mobile-sidebar,
+.mobile-overlay,
+.mobile-bottom-nav {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .desktop-sidebar {
     display: none;
   }
 
-  .main-content {
-    width: 100%;
-    padding: 0;
-    margin: 0;
+  .calfit-main {
+    margin-left: 0;
+    padding: 86px 16px 110px;
+  }
+
+  .mobile-header {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 66px;
+    z-index: 500;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    background: rgba(0,0,0,.92);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(255,255,255,.06);
+    color: #c8f542;
+    font-weight: 900;
+    letter-spacing: 4px;
+  }
+
+  .hamburger {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    border: 1px solid rgba(200,245,66,.35);
+    background: #111;
+    color: #c8f542;
+    font-size: 22px;
+  }
+
+  .mobile-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.72);
+    z-index: 800;
+  }
+
+  .mobile-sidebar {
+    display: block;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 280px;
+    max-width: 84vw;
+    background: #0b0b0b;
+    z-index: 900;
+    transform: translateX(-110%);
+    transition: transform .22s ease;
+  }
+
+  .mobile-sidebar.open {
+    transform: translateX(0);
+  }
+
+  .close-menu {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: 12px;
+    background: #171717;
+    color: #fff;
+    font-size: 22px;
+    z-index: 20;
+  }
+
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    height: 70px;
+    z-index: 700;
+    background: rgba(17,17,17,.96);
+    backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 24px;
+    align-items: center;
+    justify-content: space-around;
+    box-shadow: 0 14px 40px rgba(0,0,0,.45);
+  }
+
+  .bottom-item {
+    flex: 1;
+    height: 54px;
+    text-decoration: none;
+    color: #777;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border-radius: 16px;
+    font-size: 18px;
+  }
+
+  .bottom-item small {
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  .bottom-item.active {
+    color: #c8f542;
+    background: rgba(200,245,66,.08);
+  }
+
+  .calfit-main > div {
+    max-width: 100% !important;
+    width: 100% !important;
   }
 }
 
-@media (min-width: 769px) {
-  nav[style] {
-    display: none !important;
+@media (max-width: 640px) {
+  .calfit-main {
+    padding-left: 14px;
+    padding-right: 14px;
   }
+
+  h1 {
+    font-size: 34px !important;
+    line-height: 1.05 !important;
+  }
+
+  [style*="grid-template-columns"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  [style*="display: flex"] {
+    flex-wrap: wrap !important;
+  }
+}
+
+.page-title {
+  font-size: 44px;
+  font-weight: 900;
+  margin: 0 0 8px;
+}
+
+.page-sub {
+  color: #777;
+  margin-bottom: 24px;
+}
+
+.card {
+  background: #111;
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 22px;
+  padding: 20px;
+}
+
+.btn {
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 16px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: #c8f542;
+  color: #000;
+}
+
+.alert-error {
+  background: rgba(255,0,0,.12);
+  border: 1px solid rgba(255,0,0,.25);
+  color: #ff7777;
+  padding: 14px;
+  border-radius: 14px;
 }
