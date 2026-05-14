@@ -1,40 +1,66 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import Link from 'next/link'
 
-export default async function DashboardPage() {
-  const supabase = await createClient()
+export default function DashboardPage() {
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        background: '#000',
+        color: '#fff',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <div
+        style={{
+          width: '100%',
+          maxWidth: 420,
+          background: '#111',
+          border: '1px solid rgba(255,255,255,.08)',
+          borderRadius: 24,
+          padding: 28,
+          textAlign: 'center',
+        }}
+      >
+        <h1 style={{ color: '#c8f542', marginBottom: 10 }}>CALFIT</h1>
+        <p style={{ color: '#888', marginBottom: 24 }}>
+          Selecciona tu panel
+        </p>
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+        <div style={{ display: 'grid', gap: 12 }}>
+          <Link href="/dashboard/profe" style={btn}>
+            Panel Coach
+          </Link>
 
-  if (!user) {
-    redirect('/login')
-  }
+          <Link href="/dashboard/alumno" style={btn}>
+            Panel Alumno
+          </Link>
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .maybeSingle()
+          <Link href="/dashboard/admin" style={btnGhost}>
+            Panel Admin
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}
 
-  if (!profile?.role) {
-    redirect('/login')
-  }
+const btn = {
+  background: '#c8f542',
+  color: '#000',
+  padding: 14,
+  borderRadius: 14,
+  textDecoration: 'none',
+  fontWeight: 900,
+}
 
-  const role = String(profile.role).toLowerCase().trim()
-
-  if (role === 'profe') {
-    redirect('/dashboard/profe')
-  }
-
-  if (role === 'alumno') {
-    redirect('/dashboard/alumno')
-  }
-
-  if (role === 'super_admin' || role === 'admin') {
-    redirect('/dashboard/admin')
-  }
-
-  redirect('/login')
+const btnGhost = {
+  background: '#181818',
+  color: '#c8f542',
+  padding: 14,
+  borderRadius: 14,
+  textDecoration: 'none',
+  fontWeight: 900,
 }
