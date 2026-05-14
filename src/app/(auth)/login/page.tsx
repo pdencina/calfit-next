@@ -1,11 +1,9 @@
 'use client'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import './login.css'
 
 export default function LoginPage() {
-  const router   = useRouter()
   const [mode, setMode]         = useState<'login'|'register'>('login')
   const [role, setRole]         = useState<'profe'|'alumno'>('profe')
   const [email, setEmail]       = useState('')
@@ -22,21 +20,23 @@ export default function LoginPage() {
 
     try {
       if (mode === 'login') {
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
-        router.push('/dashboard')
-        router.refresh()
+        if (data.session) {
+          // Forzar redirect con window.location para evitar problemas con router
+          window.location.href = '/dashboard'
+        }
       } else {
         const { error } = await supabase.auth.signUp({
           email, password,
           options: { data: { full_name: fullName, role } }
         })
         if (error) throw error
-        setOk('¡Cuenta creada! Revisá tu email si necesitás confirmar.')
+        setOk('¡Cuenta creada! Iniciá sesión.')
         setMode('login')
       }
     } catch (err: any) {
-      setError(err.message || 'Error desconocido')
+      setError(err.message || 'Error al ingresar')
     } finally {
       setLoading(false)
     }
@@ -45,20 +45,14 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-bg" />
-
       <div className="login-brand">CALFIT</div>
       <div className="login-sub">PLATAFORMA PRO</div>
 
       <div className="login-box">
-        {/* Tabs */}
         <div className="login-tabs">
           {(['login', 'register'] as const).map(m => (
-            <button
-              key={m}
-              className={`login-tab ${mode === m ? 'active' : ''}`}
-              onClick={() => { setMode(m); setError('') }}
-              type="button"
-            >
+            <button key={m} className={`login-tab ${mode === m ? 'active' : ''}`}
+              onClick={() => { setMode(m); setError('') }} type="button">
               {m === 'login' ? 'Ingresar' : 'Registrarse'}
             </button>
           ))}
@@ -78,9 +72,7 @@ export default function LoginPage() {
                   {[{v:'profe',l:'📋 Profesor'},{v:'alumno',l:'🏋️ Alumno'}].map(({v,l}) => (
                     <button key={v} type="button"
                       className={`role-btn ${role === v ? 'active' : ''}`}
-                      onClick={() => setRole(v as 'profe'|'alumno')}>
-                      {l}
-                    </button>
+                      onClick={() => setRole(v as 'profe'|'alumno')}>{l}</button>
                   ))}
                 </div>
               </div>
@@ -90,7 +82,7 @@ export default function LoginPage() {
           <div className="form-group">
             <label>Email</label>
             <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-              placeholder="tu@email.com" required />
+              placeholder="tu@email.com" required autoFocus={mode === 'login'} />
           </div>
 
           <div className="form-group">
