@@ -1,384 +1,59 @@
-'use client'
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import { getSesionesAlumno } from '@/lib/supabase/api'
 
-import { useEffect, useMemo, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+export default async function HistorialPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
-type WorkoutSession = {
-  id: string
-  completed: boolean
-  duration_minutes: number
-  notes: string | null
-  created_at: string
+  const sesiones = await getSesionesAlumno(supabase, user.id, 50)
 
-  routines: {
-    titulo: string | null
-    descripcion: string | null
-  } | null
-}
-
-export default function HistorialPage() {
-  const supabase = createClient()
-
-  const [loading, setLoading] =
-    useState(true)
-
-  const [sessions, setSessions] =
-    useState<WorkoutSession[]>([])
-
-  const [message, setMessage] =
-    useState('')
-
-  async function loadData() {
-    setLoading(true)
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      window.location.href = '/login'
-      return
-    }
-
-    const { data, error } =
-      await supabase
-        .from('workout_sessions')
-        .select(`
-          *,
-          routines (
-            titulo,
-            descripcion
-          )
-        `)
-        .eq('student_id', user.id)
-        .order('created_at', {
-          ascending: false,
-        })
-
-    if (error) {
-      setMessage(error.message)
-      setLoading(false)
-      return
-    }
-
-    setSessions(data || [])
-    setLoading(false)
-  }
-
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const totalMinutes = useMemo(() => {
-    return sessions.reduce(
-      (acc, s) =>
-        acc +
-        (s.duration_minutes || 0),
-      0
-    )
-  }, [sessions])
-
-  const totalSessions =
-    sessions.length
-
-  if (loading) {
-    return (
-      <div style={styles.page}>
-        Cargando historial...
-      </div>
-    )
-  }
+  const completadas = sesiones?.filter((s: any) => s.completada).length || 0
+  const duracionTotal = sesiones?.reduce((acc: number, s: any) => acc + (s.duracion_min || 0), 0) || 0
 
   return (
-    <div style={styles.page}>
-      <div style={styles.hero}>
-        <div>
-          <h1 style={styles.title}>
-            Historial
-          </h1>
+    <div>
+      <div className="page-title">HISTORIAL</div>
+      <div className="page-sub">Todas tus sesiones de entrenamiento</div>
 
-          <p style={styles.subtitle}>
-            Todas tus sesiones y
-            entrenamientos completados.
-          </p>
+      <div className="grid-3" style={{marginBottom:24}}>
+        <div className="card">
+          <div style={{fontFamily:'"Bebas Neue",sans-serif',fontSize:36,color:'#c8f542',lineHeight:1}}>{sesiones?.length||0}</div>
+          <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:1.5,color:'#666',marginTop:6}}>Total sesiones</div>
         </div>
-
-        <button
-          style={styles.refresh}
-          onClick={loadData}
-        >
-          Actualizar
-        </button>
-      </div>
-
-      {message && (
-        <div style={styles.notice}>
-          {message}
+        <div className="card">
+          <div style={{fontFamily:'"Bebas Neue",sans-serif',fontSize:36,color:'#4ade80',lineHeight:1}}>{completadas}</div>
+          <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:1.5,color:'#666',marginTop:6}}>Completadas</div>
         </div>
-      )}
-
-      <div style={styles.statsGrid}>
-        <div style={styles.statCard}>
-          <span style={styles.statNumber}>
-            {totalSessions}
-          </span>
-
-          <span style={styles.statLabel}>
-            Sesiones
-          </span>
-        </div>
-
-        <div style={styles.statCard}>
-          <span style={styles.statNumber}>
-            {totalMinutes}
-          </span>
-
-          <span style={styles.statLabel}>
-            Minutos
-          </span>
-        </div>
-
-        <div style={styles.statCard}>
-          <span style={styles.statNumber}>
-            🔥
-          </span>
-
-          <span style={styles.statLabel}>
-            Sigue constante
-          </span>
+        <div className="card">
+          <div style={{fontFamily:'"Bebas Neue",sans-serif',fontSize:36,color:'#60a5fa',lineHeight:1}}>{duracionTotal}</div>
+          <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:1.5,color:'#666',marginTop:6}}>Minutos totales</div>
         </div>
       </div>
 
-      {sessions.length === 0 ? (
-        <div style={styles.empty}>
-          Aún no tienes sesiones
-          registradas.
-        </div>
-      ) : (
-        <div style={styles.list}>
-          {sessions.map((s) => (
-            <div
-              key={s.id}
-              style={styles.card}
-            >
-              <div style={styles.cardTop}>
-                <div>
-                  <h2 style={styles.cardTitle}>
-                    {s.routines
-                      ?.titulo ||
-                      'Entrenamiento'}
-                  </h2>
-
-                  <p
-                    style={
-                      styles.cardDesc
-                    }
-                  >
-                    {s.routines
-                      ?.descripcion ||
-                      'Sin descripción'}
-                  </p>
-                </div>
-
-                <div
-                  style={
-                    styles.badge
-                  }
-                >
-                  {s.completed
-                    ? '✅ Completado'
-                    : '⏳ En progreso'}
-                </div>
-              </div>
-
-              <div style={styles.meta}>
-                <div>
-                  📅{' '}
-                  {new Date(
-                    s.created_at
-                  ).toLocaleDateString()}
-                </div>
-
-                <div>
-                  ⏱️{' '}
-                  {
-                    s.duration_minutes
-                  }{' '}
-                  min
-                </div>
-              </div>
-
-              {s.notes && (
-                <div
-                  style={
-                    styles.notes
-                  }
-                >
-                  <strong>
-                    Notas:
-                  </strong>
-
-                  <p
-                    style={{
-                      marginTop: 8,
-                    }}
-                  >
-                    {s.notes}
-                  </p>
-                </div>
-              )}
+      <div className="card" style={{padding:0,overflow:'hidden'}}>
+        {!sesiones?.length ? (
+          <div style={{textAlign:'center',padding:'48px',color:'#444',fontSize:13}}>Sin sesiones registradas aún</div>
+        ) : sesiones.map((s: any, i: number) => (
+          <div key={s.id} style={{display:'flex',alignItems:'center',gap:14,padding:'13px 18px',borderBottom:i<sesiones.length-1?'1px solid rgba(255,255,255,0.05)':'none'}}>
+            <div style={{width:8,height:8,borderRadius:'50%',background:s.completada?'#4ade80':'#555',flexShrink:0}}/>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,fontWeight:500}}>{s.rutinas?.nombre || 'Sesión libre'}</div>
+              <div style={{fontSize:11,color:'#666',marginTop:2}}>{s.rutinas?.categoria}</div>
             </div>
-          ))}
-        </div>
-      )}
+            {s.duracion_min && (
+              <div style={{fontSize:12,color:'#666'}}>{s.duracion_min} min</div>
+            )}
+            <div style={{fontSize:12,color:'#555'}}>{new Date(s.fecha||s.created_at).toLocaleDateString('es-CL',{weekday:'short',day:'numeric',month:'short'})}</div>
+            <span style={{fontSize:11,padding:'3px 10px',borderRadius:20,
+              background:s.completada?'rgba(74,222,128,0.1)':'rgba(251,191,36,0.1)',
+              color:s.completada?'#4ade80':'#fbbf24'}}>
+              {s.completada?'Completada':'Incompleta'}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   )
-}
-
-const styles: Record<
-  string,
-  React.CSSProperties
-> = {
-  page: {
-    padding: 32,
-    color: '#fff',
-  },
-
-  hero: {
-    display: 'flex',
-    justifyContent:
-      'space-between',
-    alignItems: 'center',
-    gap: 20,
-    marginBottom: 30,
-  },
-
-  title: {
-    fontSize: 42,
-    margin: 0,
-    fontWeight: 900,
-  },
-
-  subtitle: {
-    color: '#8a8a8a',
-    marginTop: 10,
-  },
-
-  refresh: {
-    border:
-      '1px solid rgba(200,245,66,.4)',
-    background: 'transparent',
-    color: '#c8f542',
-    padding: '12px 18px',
-    borderRadius: 14,
-    cursor: 'pointer',
-  },
-
-  notice: {
-    background:
-      'rgba(200,245,66,.08)',
-    border:
-      '1px solid rgba(200,245,66,.25)',
-    color: '#c8f542',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 20,
-  },
-
-  statsGrid: {
-    display: 'grid',
-    gridTemplateColumns:
-      'repeat(auto-fit,minmax(220px,1fr))',
-    gap: 20,
-    marginBottom: 30,
-  },
-
-  statCard: {
-    background: '#111',
-    border:
-      '1px solid rgba(255,255,255,.06)',
-    borderRadius: 24,
-    padding: 24,
-  },
-
-  statNumber: {
-    fontSize: 42,
-    color: '#c8f542',
-    fontWeight: 900,
-    display: 'block',
-  },
-
-  statLabel: {
-    marginTop: 10,
-    color: '#8a8a8a',
-    display: 'block',
-  },
-
-  empty: {
-    background: '#111',
-    border:
-      '1px solid rgba(255,255,255,.06)',
-    borderRadius: 24,
-    padding: 40,
-    color: '#8a8a8a',
-    textAlign: 'center',
-  },
-
-  list: {
-    display: 'grid',
-    gap: 20,
-  },
-
-  card: {
-    background: '#111',
-    border:
-      '1px solid rgba(255,255,255,.06)',
-    borderRadius: 24,
-    padding: 24,
-  },
-
-  cardTop: {
-    display: 'flex',
-    justifyContent:
-      'space-between',
-    gap: 20,
-    alignItems: 'center',
-  },
-
-  cardTitle: {
-    color: '#c8f542',
-    marginBottom: 10,
-  },
-
-  cardDesc: {
-    color: '#8a8a8a',
-  },
-
-  badge: {
-    background:
-      'linear-gradient(135deg,#c8f542,#9eff00)',
-    color: '#000',
-    padding: '10px 14px',
-    borderRadius: 14,
-    fontWeight: 800,
-    whiteSpace: 'nowrap',
-  },
-
-  meta: {
-    display: 'flex',
-    gap: 20,
-    marginTop: 20,
-    color: '#ddd',
-    flexWrap: 'wrap',
-  },
-
-  notes: {
-    marginTop: 20,
-    background: '#0a0a0a',
-    border:
-      '1px solid rgba(255,255,255,.06)',
-    borderRadius: 16,
-    padding: 18,
-    color: '#ddd',
-  },
 }

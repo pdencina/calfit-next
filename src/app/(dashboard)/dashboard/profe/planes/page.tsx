@@ -1,413 +1,100 @@
-'use client'
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import { fmtCLP } from '@/lib/supabase/api'
 
-import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-
-type Plan = {
-  name: string
-  price: string
-  maxStudents: string
-  features: string[]
-  recommended?: boolean
-}
-
-const plans: Plan[] = [
-  {
-    name: 'Free',
-    price: '$0',
-    maxStudents: 'Hasta 3 alumnos',
-    features: [
-      'Rutinas básicas',
-      'Asignación manual',
-      'Historial simple',
-      'Chat básico',
-    ],
-  },
-  {
-    name: 'Coach Pro',
-    price: '$9.990',
-    maxStudents: 'Hasta 20 alumnos',
-    recommended: true,
-    features: [
-      'Biblioteca CALFIT',
-      'Rutinas ilimitadas',
-      'Métricas de alumnos',
-      'Objetivos y progreso',
-      'Chat coach/alumno',
-    ],
-  },
-  {
-    name: 'Academy',
-    price: '$24.990',
-    maxStudents: 'Hasta 100 alumnos',
-    features: [
-      'Multi coach',
-      'Ranking de alumnos',
-      'Reportes avanzados',
-      'Marca de academia',
-      'Soporte prioritario',
-    ],
-  },
-  {
-    name: 'Unlimited',
-    price: '$49.990',
-    maxStudents: 'Alumnos ilimitados',
-    features: [
-      'Todo incluido',
-      'Academias ilimitadas',
-      'Analytics avanzado',
-      'Marketplace de rutinas',
-      'Soporte premium',
-    ],
-  },
+const PLANES = [
+  { id:'starter', nombre:'STARTER', precio_mes:18000, precio_anual:145000, max_alumnos:10, color:'#888',
+    features:['Hasta 10 alumnos','Rutinas ilimitadas','Mensajería','Dashboard financiero','Cobros con Mercado Pago'],
+    sin:['Métricas avanzadas','Nutrición'] },
+  { id:'pro', nombre:'PRO', precio_mes:37000, precio_anual:295000, max_alumnos:50, color:'#c8f542', badge:'MÁS POPULAR',
+    features:['Hasta 50 alumnos','Todo Starter','Métricas corporales','Videos en ejercicios','Planes de nutrición','Soporte prioritario'],
+    sin:[] },
+  { id:'elite', nombre:'ELITE', precio_mes:65000, precio_anual:520000, max_alumnos:999, color:'#fbbf24',
+    features:['Alumnos ilimitados','Todo Pro','White label','API access','Manager de equipo','Onboarding 1:1'],
+    sin:[] },
 ]
 
-export default function ProfePlanPage() {
-  const supabase = createClient()
+export default async function PlanesPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
-  const [loading, setLoading] = useState(true)
-  const [studentCount, setStudentCount] = useState(0)
-  const [routineCount, setRoutineCount] = useState(0)
-  const [currentPlan, setCurrentPlan] = useState('Coach Pro')
-  const [message, setMessage] = useState('')
-
-  async function loadData() {
-    setLoading(true)
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      window.location.href = '/login'
-      return
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id, academia_id, plan')
-      .eq('id', user.id)
-      .single()
-
-    if (profile?.plan) {
-      setCurrentPlan(profile.plan)
-    }
-
-    const { data: students } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('role', 'alumno')
-      .eq('academia_id', profile?.academia_id)
-
-    setStudentCount(students?.length || 0)
-
-    const { data: routines } = await supabase
-      .from('routines')
-      .select('id')
-      .eq('profe_id', user.id)
-      .eq('is_template', false)
-
-    setRoutineCount(routines?.length || 0)
-
-    setLoading(false)
-  }
-
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  async function selectPlan(planName: string) {
-    setMessage('')
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) return
-
-    const { error } = await supabase
-      .from('profiles')
-      .update({ plan: planName })
-      .eq('id', user.id)
-
-    if (error) {
-      setMessage(error.message)
-      return
-    }
-
-    setCurrentPlan(planName)
-    setMessage(`Plan actualizado a ${planName}.`)
-  }
-
-  if (loading) {
-    return <div style={styles.page}>Cargando plan...</div>
-  }
+  const { data: org } = await supabase.from('organizations').select('*, plans(*)').eq('owner_id', user.id).single()
+  const currentPlan = org?.plan_id || 'starter'
+  const isTrial     = org?.plan_status === 'trialing'
+  const trialDays   = org?.trial_ends_at
+    ? Math.max(0, Math.ceil((new Date(org.trial_ends_at).getTime() - Date.now()) / 86400000))
+    : 0
 
   return (
-    <div style={styles.page}>
-      <div style={styles.header}>
-        <div>
-          <h1 style={styles.title}>Mi Plan</h1>
-          <p style={styles.subtitle}>
-            Administra tu suscripción y escala tu academia.
-          </p>
+    <div>
+      <div className="page-title">MI PLAN</div>
+      <div className="page-sub">Elegí el plan que se adapta a tu negocio</div>
+
+      {isTrial && (
+        <div style={{background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:12,padding:'14px 20px',marginBottom:24,display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
+          <div>
+            <div style={{fontSize:14,fontWeight:500,color:'#fbbf24'}}>⏳ Trial activo — {trialDays} días restantes</div>
+            <div style={{fontSize:12,color:'#888',marginTop:2}}>Al terminar el trial, elegí un plan para seguir usando CALFIT PRO</div>
+          </div>
         </div>
+      )}
 
-        <div style={styles.currentPlan}>
-          Plan actual: <strong>{currentPlan}</strong>
-        </div>
-      </div>
+      <p style={{fontSize:13,color:'#666',marginBottom:28,textAlign:'center'}}>Precios en CLP · Sin IVA · Cancelá cuando quieras</p>
 
-      {message && <div style={styles.notice}>{message}</div>}
-
-      <div style={styles.usageGrid}>
-        <div style={styles.usageCard}>
-          <span style={styles.usageNumber}>{studentCount}</span>
-          <span style={styles.usageLabel}>Alumnos activos</span>
-        </div>
-
-        <div style={styles.usageCard}>
-          <span style={styles.usageNumber}>{routineCount}</span>
-          <span style={styles.usageLabel}>Rutinas creadas</span>
-        </div>
-
-        <div style={styles.usageCard}>
-          <span style={styles.usageNumber}>CLP</span>
-          <span style={styles.usageLabel}>Moneda local</span>
-        </div>
-      </div>
-
-      <div style={styles.plansGrid}>
-        {plans.map((plan) => {
-          const isCurrent = currentPlan === plan.name
-
+      <div className="grid-3">
+        {PLANES.map(plan => {
+          const isCurrent = currentPlan === plan.id
           return (
-            <div
-              key={plan.name}
-              style={{
-                ...styles.planCard,
-                borderColor: plan.recommended
-                  ? '#c8f542'
-                  : 'rgba(255,255,255,.08)',
-              }}
-            >
-              {plan.recommended && (
-                <div style={styles.recommended}>RECOMENDADO</div>
+            <div key={plan.id} className="card" style={{
+              borderColor:isCurrent?plan.color:'rgba(255,255,255,0.07)',
+              background:isCurrent?`rgba(200,245,66,0.02)`:'var(--surface2)',
+              display:'flex',flexDirection:'column',position:'relative',
+            }}>
+              {plan.badge && (
+                <div style={{position:'absolute',top:-12,left:'50%',transform:'translateX(-50%)',background:'#c8f542',color:'#070707',fontSize:10,fontWeight:700,letterSpacing:1.5,padding:'4px 14px',borderRadius:20}}>
+                  {plan.badge}
+                </div>
               )}
-
-              <h2 style={styles.planName}>{plan.name}</h2>
-
-              <div style={styles.price}>
-                {plan.price}
-                <span style={styles.month}> / mes</span>
-              </div>
-
-              <p style={styles.maxStudents}>{plan.maxStudents}</p>
-
-              <div style={styles.features}>
-                {plan.features.map((feature) => (
-                  <div key={feature} style={styles.feature}>
-                    ✅ {feature}
+              <div style={{fontFamily:'"Bebas Neue",sans-serif',fontSize:24,letterSpacing:3,color:plan.color,marginBottom:4}}>{plan.nombre}</div>
+              <div style={{fontSize:12,color:'#555',marginBottom:16}}>{plan.max_alumnos >= 999 ? 'Alumnos ilimitados' : `Hasta ${plan.max_alumnos} alumnos`}</div>
+              <div style={{fontFamily:'"Bebas Neue",sans-serif',fontSize:40,lineHeight:1,marginBottom:4}}>{fmtCLP(plan.precio_mes)}</div>
+              <div style={{fontSize:12,color:'#666',marginBottom:20}}>/mes · CLP</div>
+              <div style={{height:1,background:'rgba(255,255,255,0.07)',marginBottom:16}}/>
+              <div style={{flex:1,marginBottom:20}}>
+                {plan.features.map((f,i) => (
+                  <div key={i} style={{display:'flex',gap:8,marginBottom:8,fontSize:13}}>
+                    <span style={{color:'#c8f542',flexShrink:0}}>✓</span><span>{f}</span>
+                  </div>
+                ))}
+                {plan.sin.map((f,i) => (
+                  <div key={i} style={{display:'flex',gap:8,marginBottom:8,fontSize:13,opacity:0.3}}>
+                    <span style={{flexShrink:0}}>—</span><span>{f}</span>
                   </div>
                 ))}
               </div>
-
-              <button
-                style={{
-                  ...styles.button,
-                  opacity: isCurrent ? 0.5 : 1,
-                }}
-                disabled={isCurrent}
-                onClick={() => selectPlan(plan.name)}
-              >
-                {isCurrent ? 'Plan actual' : 'Elegir plan'}
-              </button>
+              {isCurrent ? (
+                <div style={{padding:'12px',textAlign:'center',border:'1px solid rgba(255,255,255,0.1)',borderRadius:8,color:'#666',fontSize:13}}>
+                  Plan actual {isTrial ? '(trial)' : '✓'}
+                </div>
+              ) : (
+                <a href={`https://wa.me/56949616038?text=Hola%2C+quiero+contratar+el+plan+${plan.nombre}+de+CALFIT+PRO`}
+                  target="_blank"
+                  style={{display:'block',padding:'12px',textAlign:'center',background:plan.id==='pro'?'#c8f542':'transparent',color:plan.id==='pro'?'#070707':'#f0efe8',borderRadius:8,border:plan.id==='pro'?'none':'1px solid rgba(255,255,255,0.15)',fontFamily:'"Bebas Neue",sans-serif',fontSize:16,letterSpacing:2,textDecoration:'none',transition:'opacity 0.2s'}}>
+                  CONTRATAR →
+                </a>
+              )}
             </div>
           )
         })}
       </div>
 
-      <div style={styles.card}>
-        <h2 style={styles.sectionTitle}>Próximo paso comercial</h2>
-
-        <p style={styles.text}>
-          Cuando conectemos pagos, este botón podrá enviar al coach a
-          MercadoPago, Stripe o Webpay para activar el plan automáticamente.
-        </p>
-
-        <div style={styles.roadmap}>
-          <span>💳 Integración pagos</span>
-          <span>📄 Facturación</span>
-          <span>🔐 Límites por plan</span>
-          <span>📈 Upgrade automático</span>
-        </div>
+      <div style={{marginTop:28,textAlign:'center'}}>
+        <a href="https://wa.me/56949616038?text=Hola%2C+quiero+consultar+sobre+CALFIT+PRO" target="_blank"
+          style={{display:'inline-flex',alignItems:'center',gap:8,background:'#25D366',color:'#fff',padding:'12px 28px',borderRadius:8,fontSize:14,fontWeight:500,textDecoration:'none'}}>
+          💬 Hablar con soporte por WhatsApp
+        </a>
       </div>
     </div>
   )
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    padding: 32,
-    color: '#fff',
-  },
-
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 20,
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-
-  title: {
-    fontSize: 42,
-    margin: 0,
-    fontWeight: 900,
-  },
-
-  subtitle: {
-    color: '#8a8a8a',
-    marginTop: 10,
-  },
-
-  currentPlan: {
-    background: '#111',
-    border: '1px solid rgba(255,255,255,.08)',
-    borderRadius: 18,
-    padding: '16px 20px',
-    color: '#c8f542',
-  },
-
-  notice: {
-    background: 'rgba(200,245,66,.08)',
-    border: '1px solid rgba(200,245,66,.25)',
-    color: '#c8f542',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 20,
-  },
-
-  usageGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))',
-    gap: 20,
-    marginBottom: 30,
-  },
-
-  usageCard: {
-    background: '#111',
-    border: '1px solid rgba(255,255,255,.06)',
-    borderRadius: 24,
-    padding: 24,
-  },
-
-  usageNumber: {
-    display: 'block',
-    color: '#c8f542',
-    fontSize: 38,
-    fontWeight: 900,
-  },
-
-  usageLabel: {
-    color: '#8a8a8a',
-    marginTop: 8,
-    display: 'block',
-  },
-
-  plansGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))',
-    gap: 20,
-    marginBottom: 30,
-  },
-
-  planCard: {
-    position: 'relative',
-    background: '#111',
-    border: '1px solid rgba(255,255,255,.08)',
-    borderRadius: 26,
-    padding: 26,
-  },
-
-  recommended: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    background: '#c8f542',
-    color: '#000',
-    borderRadius: 999,
-    padding: '6px 10px',
-    fontSize: 11,
-    fontWeight: 900,
-  },
-
-  planName: {
-    color: '#fff',
-    marginTop: 0,
-    fontSize: 26,
-  },
-
-  price: {
-    color: '#c8f542',
-    fontSize: 34,
-    fontWeight: 900,
-    marginBottom: 10,
-  },
-
-  month: {
-    color: '#8a8a8a',
-    fontSize: 14,
-  },
-
-  maxStudents: {
-    color: '#8a8a8a',
-    marginBottom: 20,
-  },
-
-  features: {
-    display: 'grid',
-    gap: 10,
-    marginBottom: 24,
-  },
-
-  feature: {
-    color: '#ddd',
-    fontSize: 14,
-  },
-
-  button: {
-    width: '100%',
-    background: '#c8f542',
-    color: '#000',
-    border: 0,
-    borderRadius: 14,
-    padding: 15,
-    fontWeight: 900,
-    cursor: 'pointer',
-  },
-
-  card: {
-    background: '#111',
-    border: '1px solid rgba(255,255,255,.06)',
-    borderRadius: 24,
-    padding: 24,
-  },
-
-  sectionTitle: {
-    marginTop: 0,
-    fontSize: 26,
-  },
-
-  text: {
-    color: '#8a8a8a',
-    lineHeight: 1.6,
-  },
-
-  roadmap: {
-    display: 'flex',
-    gap: 12,
-    flexWrap: 'wrap',
-    marginTop: 18,
-  },
 }

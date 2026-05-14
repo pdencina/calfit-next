@@ -1,210 +1,114 @@
 'use client'
-
-import Link from 'next/link'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import './login.css'
 
 export default function LoginPage() {
-  const supabase = createClient()
-
-  const [email, setEmail] = useState('')
+  const router   = useRouter()
+  const [mode, setMode]         = useState<'login'|'register'>('login')
+  const [role, setRole]         = useState<'profe'|'alumno'>('profe')
+  const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [loading, setLoading]   = useState(false)
+  const [error, setError]       = useState('')
+  const [ok, setOk]             = useState('')
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    setError(''); setOk(''); setLoading(true)
+    const supabase = createClient()
 
-    setLoading(true)
-    setError('')
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (error) {
-      setError(error.message)
+    try {
+      if (mode === 'login') {
+        const { error } = await supabase.auth.signInWithPassword({ email, password })
+        if (error) throw error
+        router.push('/dashboard')
+        router.refresh()
+      } else {
+        const { error } = await supabase.auth.signUp({
+          email, password,
+          options: { data: { full_name: fullName, role } }
+        })
+        if (error) throw error
+        setOk('¡Cuenta creada! Revisá tu email si necesitás confirmar.')
+        setMode('login')
+      }
+    } catch (err: any) {
+      setError(err.message || 'Error desconocido')
+    } finally {
       setLoading(false)
-      return
     }
-
-    window.location.href = '/dashboard'
   }
 
   return (
-    <main style={styles.main}>
-      <div style={styles.card}>
-        <h1 style={styles.logo}>CALFIT</h1>
+    <div className="login-page">
+      <div className="login-bg" />
 
-        <p style={styles.subtitle}>PLATAFORMA PRO</p>
+      <div className="login-brand">CALFIT</div>
+      <div className="login-sub">PLATAFORMA PRO</div>
 
-        <h2 style={styles.title}>Ingresar</h2>
-
-        <p style={styles.description}>
-          Accede a tu panel de coach o alumno.
-        </p>
+      <div className="login-box">
+        {/* Tabs */}
+        <div className="login-tabs">
+          {(['login', 'register'] as const).map(m => (
+            <button
+              key={m}
+              className={`login-tab ${mode === m ? 'active' : ''}`}
+              onClick={() => { setMode(m); setError('') }}
+              type="button"
+            >
+              {m === 'login' ? 'Ingresar' : 'Registrarse'}
+            </button>
+          ))}
+        </div>
 
         <form onSubmit={handleSubmit}>
-          <input
-            style={styles.input}
-            placeholder="Correo"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
+          {mode === 'register' && (
+            <>
+              <div className="form-group">
+                <label>Nombre completo</label>
+                <input type="text" value={fullName} onChange={e => setFullName(e.target.value)}
+                  placeholder="Carlos García" required autoFocus />
+              </div>
+              <div className="form-group">
+                <label>Tipo de cuenta</label>
+                <div className="role-toggle">
+                  {[{v:'profe',l:'📋 Profesor'},{v:'alumno',l:'🏋️ Alumno'}].map(({v,l}) => (
+                    <button key={v} type="button"
+                      className={`role-btn ${role === v ? 'active' : ''}`}
+                      onClick={() => setRole(v as 'profe'|'alumno')}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
 
-          <input
-            style={styles.input}
-            placeholder="Contraseña"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+          <div className="form-group">
+            <label>Email</label>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+              placeholder="tu@email.com" required />
+          </div>
 
-          {error && <div style={styles.error}>{error}</div>}
+          <div className="form-group">
+            <label>Contraseña</label>
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+              placeholder="••••••••" required minLength={6} />
+          </div>
 
-          <button style={styles.button} disabled={loading}>
-            {loading ? 'INGRESANDO...' : 'ENTRAR'}
+          {error && <div className="alert-error">{error}</div>}
+          {ok    && <div className="alert-ok">{ok}</div>}
+
+          <button type="submit" className="btn-login" disabled={loading}>
+            {loading ? 'CARGANDO...' : mode === 'login' ? 'ENTRAR' : 'CREAR CUENTA'}
           </button>
         </form>
-
-        <div style={styles.divider} />
-
-        <div style={styles.registerBox}>
-          <p style={styles.registerText}>
-            ¿Eres coach y quieres crear tu academia?
-          </p>
-
-          <Link href="/register-coach" style={styles.registerButton}>
-            EMPEZAR GRATIS
-          </Link>
-
-          <Link href="/join-academy" style={styles.studentLink}>
-            Soy alumno y tengo código de invitación
-          </Link>
-        </div>
       </div>
-    </main>
+
+      <div className="login-footer">Trial gratis de 14 días · Sin tarjeta requerida</div>
+    </div>
   )
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  main: {
-    minHeight: '100vh',
-    background: '#000',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    color: '#fff',
-    fontFamily: 'Arial',
-    padding: 20,
-  },
-
-  card: {
-    width: '100%',
-    maxWidth: 520,
-    background: '#111',
-    padding: 42,
-    borderRadius: 28,
-    border: '1px solid rgba(255,255,255,.06)',
-  },
-
-  logo: {
-    color: '#c6ff32',
-    fontSize: 64,
-    fontWeight: 900,
-    letterSpacing: 10,
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-
-  subtitle: {
-    textAlign: 'center',
-    color: '#666',
-    letterSpacing: 6,
-    marginBottom: 34,
-  },
-
-  title: {
-    color: '#fff',
-    fontSize: 30,
-    margin: 0,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-
-  description: {
-    color: '#777',
-    textAlign: 'center',
-    marginBottom: 28,
-  },
-
-  input: {
-    width: '100%',
-    padding: 16,
-    marginBottom: 14,
-    borderRadius: 14,
-    border: '1px solid #333',
-    background: '#000',
-    color: '#fff',
-    boxSizing: 'border-box',
-  },
-
-  button: {
-    width: '100%',
-    padding: 18,
-    borderRadius: 14,
-    border: 'none',
-    background: '#c6ff32',
-    color: '#000',
-    fontWeight: 900,
-    marginTop: 12,
-    cursor: 'pointer',
-  },
-
-  error: {
-    background: '#3b0b0b',
-    color: '#ff7b7b',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-
-  divider: {
-    height: 1,
-    background: 'rgba(255,255,255,.08)',
-    margin: '28px 0',
-  },
-
-  registerBox: {
-    textAlign: 'center',
-  },
-
-  registerText: {
-    color: '#777',
-    marginBottom: 14,
-  },
-
-  registerButton: {
-    display: 'block',
-    width: '100%',
-    padding: 16,
-    borderRadius: 14,
-    border: '1px solid rgba(198,255,50,.45)',
-    color: '#c6ff32',
-    textDecoration: 'none',
-    fontWeight: 900,
-    boxSizing: 'border-box',
-  },
-
-  studentLink: {
-    display: 'block',
-    marginTop: 14,
-    color: '#888',
-    textDecoration: 'none',
-    fontSize: 14,
-  },
 }

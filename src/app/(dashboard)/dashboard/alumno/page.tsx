@@ -1,526 +1,169 @@
 'use client'
-
-import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { getRutinasAlumno, createSesion, completarSesion, getEstadisticasAlumno } from '@/lib/supabase/api'
 
-type WorkoutSession = {
-  id: string
-  completed: boolean
-  duration_minutes: number
-  created_at: string
-}
-
-type StudentRoutine = {
-  id: string
-  routines: {
-    id: string
-    titulo: string
-    descripcion: string
-    objetivo?: string
-    duracion_min?: number
-  }
-}
-
-export default function AlumnoDashboardPage() {
-  const supabase = createClient()
-
-  const [loading, setLoading] = useState(true)
-  const [sessions, setSessions] = useState<WorkoutSession[]>([])
-  const [routines, setRoutines] = useState<StudentRoutine[]>([])
-  const [studentName, setStudentName] = useState('Alumno')
-
-  async function loadDashboard() {
-    setLoading(true)
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      window.location.href = '/login'
-      return
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
-
-    if (profile?.full_name) setStudentName(profile.full_name)
-
-    const { data: sessionsData } = await supabase
-      .from('workout_sessions')
-      .select('*')
-      .eq('student_id', user.id)
-      .order('created_at', { ascending: false })
-
-    setSessions(sessionsData || [])
-
-    const { data: routinesData } = await supabase
-      .from('student_routines')
-      .select(`
-        *,
-        routines (
-          id,
-          titulo,
-          descripcion,
-          objetivo,
-          duracion_min
-        )
-      `)
-      .eq('student_id', user.id)
-
-    setRoutines(routinesData || [])
-    setLoading(false)
-  }
+function Timer({ sesionId, orgId, onComplete }: any) {
+  const [secs, setSecs]         = useState(0)
+  const [restando, setRestando] = useState(0)
+  const [ejActual, setEjActual] = useState(0)
+  const intervalRef = useRef<any>(null)
+  const restoRef    = useRef<any>(null)
 
   useEffect(() => {
-    loadDashboard()
+    intervalRef.current = setInterval(() => setSecs(s => s + 1), 1000)
+    return () => clearInterval(intervalRef.current)
   }, [])
 
-  const completedSessions = sessions.filter((s) => s.completed).length
+  const fmt = (s: number) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`
 
-  const totalMinutes = sessions.reduce(
-    (acc, s) => acc + (s.duration_minutes || 0),
-    0
-  )
+  function iniciarDescanso(segundos: number) {
+    clearInterval(restoRef.current)
+    setRestando(segundos)
+    restoRef.current = setInterval(() => {
+      setRestando(p => {
+        if (p <= 1) { clearInterval(restoRef.current); return 0 }
+        return p - 1
+      })
+    }, 1000)
+  }
 
-  const xp = completedSessions * 120 + totalMinutes * 2
-  const level = Math.floor(xp / 1000) + 1
-  const currentLevelXp = xp % 1000
-  const nextLevelPercent = Math.min(Math.round((currentLevelXp / 1000) * 100), 100)
-
-  const streak = useMemo(() => {
-    const uniqueDays = Array.from(
-      new Set(
-        sessions
-          .filter((s) => s.completed)
-          .map((s) => new Date(s.created_at).toDateString())
-      )
-    )
-
-    let count = 0
-    const today = new Date()
-
-    for (let i = 0; i < 30; i++) {
-      const date = new Date(today)
-      date.setDate(today.getDate() - i)
-
-      if (uniqueDays.includes(date.toDateString())) {
-        count++
-      } else if (i > 0) {
-        break
-      }
-    }
-
-    return count
-  }, [sessions])
-
-  const weeklyProgress = useMemo(() => {
-    const today = new Date()
-
-    return Array.from({ length: 7 }).map((_, index) => {
-      const date = new Date(today)
-      date.setDate(today.getDate() - (6 - index))
-
-      const count = sessions.filter((s) => {
-        const d = new Date(s.created_at)
-        return d.toDateString() === date.toDateString()
-      }).length
-
-      return {
-        label: date.toLocaleDateString('es-CL', { weekday: 'short' }),
-        count,
-      }
-    })
-  }, [sessions])
-
-  const achievements = [
-    {
-      title: 'Primer entrenamiento',
-      unlocked: completedSessions >= 1,
-      icon: '🏁',
-    },
-    {
-      title: '5 sesiones completadas',
-      unlocked: completedSessions >= 5,
-      icon: '🔥',
-    },
-    {
-      title: '100 minutos entrenados',
-      unlocked: totalMinutes >= 100,
-      icon: '⏱️',
-    },
-    {
-      title: 'Nivel 3 alcanzado',
-      unlocked: level >= 3,
-      icon: '🏆',
-    },
-  ]
-
-  if (loading) {
-    return <div style={styles.page}>Cargando dashboard...</div>
+  async function handleComplete() {
+    clearInterval(intervalRef.current)
+    if (!confirm(`¿Completar sesión? Duración: ${fmt(secs)}`)) return
+    const sb = createClient()
+    await completarSesion(sb, sesionId, { duracion_min: Math.round(secs/60) })
+    onComplete()
   }
 
   return (
-    <div style={styles.page}>
-      <div style={styles.hero}>
-        <div>
-          <h1 style={styles.title}>Hola {studentName} 👋</h1>
-          <p style={styles.subtitle}>
-            Sube de nivel, mantén tu racha y completa tus entrenamientos.
-          </p>
-        </div>
-
-        <div style={styles.streakCard}>🔥 {streak} días de racha</div>
-      </div>
-
-      <div style={styles.levelCard}>
-        <div style={styles.levelHeader}>
-          <div>
-            <div style={styles.levelLabel}>NIVEL ACTUAL</div>
-            <div style={styles.levelNumber}>Nivel {level}</div>
-          </div>
-
-          <div style={styles.xpText}>{xp} XP</div>
-        </div>
-
-        <div style={styles.progressBar}>
-          <div style={{ ...styles.progressFill, width: `${nextLevelPercent}%` }} />
-        </div>
-
-        <div style={styles.progressFooter}>
-          <span>{currentLevelXp} / 1000 XP</span>
-          <span>{nextLevelPercent}% al próximo nivel</span>
-        </div>
-      </div>
-
-      <div style={styles.statsGrid}>
-        <div style={styles.statCard}>
-          <span style={styles.statNumber}>{routines.length}</span>
-          <span style={styles.statLabel}>Rutinas activas</span>
-        </div>
-
-        <div style={styles.statCard}>
-          <span style={styles.statNumber}>{completedSessions}</span>
-          <span style={styles.statLabel}>Sesiones completadas</span>
-        </div>
-
-        <div style={styles.statCard}>
-          <span style={styles.statNumber}>{totalMinutes}</span>
-          <span style={styles.statLabel}>Minutos entrenados</span>
-        </div>
-      </div>
-
-      <div style={styles.grid}>
-        <Link href="/dashboard/alumno/rutinas" style={styles.card}>
-          <div style={styles.cardEmoji}>💪</div>
-          <h2 style={styles.cardTitle}>Ver mis rutinas</h2>
-          <p style={styles.cardText}>Revisa tus entrenamientos y ejercicios asignados.</p>
-        </Link>
-
-        <Link href="/dashboard/alumno/historial" style={styles.card}>
-          <div style={styles.cardEmoji}>📆</div>
-          <h2 style={styles.cardTitle}>Historial</h2>
-          <p style={styles.cardText}>Mira todas tus sesiones y entrenamientos completados.</p>
-        </Link>
-
-        <Link href="/dashboard/alumno/metricas" style={styles.card}>
-          <div style={styles.cardEmoji}>📊</div>
-          <h2 style={styles.cardTitle}>Métricas</h2>
-          <p style={styles.cardText}>Visualiza tu progreso, constancia y evolución.</p>
-        </Link>
-      </div>
-
-      <div style={styles.twoCols}>
-        <div style={styles.section}>
-          <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitle}>Progreso semanal</h2>
-          </div>
-
-          <div style={styles.weekGrid}>
-            {weeklyProgress.map((day) => (
-              <div key={day.label} style={styles.dayBox}>
-                <div
-                  style={{
-                    ...styles.dayDot,
-                    background: day.count > 0 ? '#c6ff32' : '#222',
-                  }}
-                />
-                <span style={styles.dayLabel}>{day.label}</span>
-                <strong style={styles.dayCount}>{day.count}</strong>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div style={styles.section}>
-          <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitle}>Logros</h2>
-          </div>
-
-          <div style={styles.achievementList}>
-            {achievements.map((a) => (
-              <div
-                key={a.title}
-                style={{
-                  ...styles.achievement,
-                  opacity: a.unlocked ? 1 : 0.35,
-                }}
-              >
-                <span style={styles.achievementIcon}>{a.icon}</span>
-                <span>{a.title}</span>
-                <strong>{a.unlocked ? 'Desbloqueado' : 'Bloqueado'}</strong>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div style={styles.section}>
-        <div style={styles.sectionHeader}>
-          <h2 style={styles.sectionTitle}>Rutinas activas</h2>
-          <Link href="/dashboard/alumno/rutinas" style={styles.link}>
-            Ver todas →
-          </Link>
-        </div>
-
-        {routines.length === 0 ? (
-          <div style={styles.empty}>Aún no tienes rutinas asignadas.</div>
-        ) : (
-          <div style={styles.routineList}>
-            {routines.map((r) => (
-              <div key={r.id} style={styles.routineCard}>
-                <div>
-                  <h3 style={styles.routineTitle}>{r.routines?.titulo}</h3>
-                  <p style={styles.routineDesc}>{r.routines?.descripcion}</p>
-                  <p style={styles.goal}>🎯 {r.routines?.objetivo}</p>
-                </div>
-
-                <div style={styles.time}>
-                  ⏱️ {r.routines?.duracion_min || 45} min
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div style={styles.section}>
-        <div style={styles.sectionHeader}>
-          <h2 style={styles.sectionTitle}>Últimas sesiones</h2>
-        </div>
-
-        {sessions.length === 0 ? (
-          <div style={styles.empty}>Aún no registras sesiones.</div>
-        ) : (
-          <div style={styles.sessionList}>
-            {sessions.slice(0, 5).map((s) => (
-              <div key={s.id} style={styles.sessionCard}>
-                <div>
-                  <strong>
-                    {s.completed ? '✅ Entrenamiento completado' : '⏳ En progreso'}
-                  </strong>
-
-                  <p style={{ color: '#8a8a8a', marginTop: 4 }}>
-                    {new Date(s.created_at).toLocaleDateString('es-CL')}
-                  </p>
-                </div>
-
-                <div style={styles.sessionMinutes}>⏱️ {s.duration_minutes} min</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+    <div style={{position:'fixed',bottom:24,right:24,background:'#111',border:'1px solid rgba(200,245,66,0.3)',borderRadius:14,padding:'18px 22px',zIndex:200,boxShadow:'0 8px 32px rgba(0,0,0,0.6)',minWidth:220}}>
+      <div style={{fontSize:11,letterSpacing:2,textTransform:'uppercase',color:'#666',marginBottom:4}}>Sesión activa</div>
+      <div style={{fontFamily:'"Bebas Neue",sans-serif',fontSize:48,color:'#c8f542',lineHeight:1,letterSpacing:2}}>{fmt(secs)}</div>
+      {restando > 0 && (
+        <div style={{fontSize:13,color:'#fbbf24',marginTop:4}}>⏳ Descanso: {fmt(restando)}</div>
+      )}
+      <button onClick={handleComplete} className="btn btn-primary" style={{width:'100%',marginTop:12,fontSize:15,letterSpacing:2}}>
+        ✓ COMPLETAR
+      </button>
     </div>
   )
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  page: { padding: 32, color: '#fff' },
-  hero: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 20,
-    marginBottom: 30,
-  },
-  title: { fontSize: 42, margin: 0, fontWeight: 900 },
-  subtitle: { color: '#8a8a8a', marginTop: 10 },
-  streakCard: {
-    background: 'linear-gradient(135deg,#c6ff32,#9eff00)',
-    color: '#000',
-    padding: '18px 22px',
-    borderRadius: 18,
-    fontWeight: 900,
-    fontSize: 18,
-    whiteSpace: 'nowrap',
-  },
-  levelCard: {
-    background: '#111',
-    border: '1px solid rgba(255,255,255,.08)',
-    borderRadius: 26,
-    padding: 26,
-    marginBottom: 30,
-  },
-  levelHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 18,
-  },
-  levelLabel: { color: '#777', fontSize: 12, letterSpacing: 2 },
-  levelNumber: { color: '#c6ff32', fontSize: 36, fontWeight: 900 },
-  xpText: { color: '#fff', fontSize: 26, fontWeight: 900 },
-  progressBar: {
-    height: 16,
-    background: '#050505',
-    borderRadius: 999,
-    overflow: 'hidden',
-    border: '1px solid rgba(255,255,255,.06)',
-  },
-  progressFill: {
-    height: '100%',
-    background: 'linear-gradient(90deg,#c6ff32,#00ff88)',
-  },
-  progressFooter: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    color: '#8a8a8a',
-    marginTop: 10,
-    fontSize: 13,
-  },
-  statsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))',
-    gap: 20,
-    marginBottom: 30,
-  },
-  statCard: {
-    background: '#111',
-    border: '1px solid rgba(255,255,255,.08)',
-    borderRadius: 22,
-    padding: 24,
-  },
-  statNumber: {
-    fontSize: 42,
-    fontWeight: 900,
-    color: '#c6ff32',
-    display: 'block',
-  },
-  statLabel: { color: '#8a8a8a', marginTop: 8, display: 'block' },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-    gap: 20,
-    marginBottom: 30,
-  },
-  card: {
-    display: 'block',
-    background: '#111',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 24,
-    padding: 24,
-    color: '#fff',
-    textDecoration: 'none',
-  },
-  cardEmoji: { fontSize: 42, marginBottom: 16 },
-  cardTitle: { color: '#c6ff32', marginBottom: 10 },
-  cardText: { color: '#8a8a8a', lineHeight: 1.5 },
-  twoCols: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))',
-    gap: 20,
-    marginBottom: 24,
-  },
-  section: {
-    background: '#111',
-    borderRadius: 24,
-    padding: 24,
-    marginBottom: 24,
-    border: '1px solid rgba(255,255,255,.06)',
-  },
-  sectionHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  sectionTitle: { margin: 0, fontSize: 28 },
-  link: { color: '#c6ff32', textDecoration: 'none', fontWeight: 700 },
-  weekGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(7,1fr)',
-    gap: 10,
-  },
-  dayBox: {
-    background: '#0a0a0a',
-    borderRadius: 16,
-    padding: 14,
-    textAlign: 'center',
-    border: '1px solid rgba(255,255,255,.06)',
-  },
-  dayDot: {
-    width: 18,
-    height: 18,
-    borderRadius: '50%',
-    margin: '0 auto 10px',
-  },
-  dayLabel: {
-    display: 'block',
-    color: '#8a8a8a',
-    textTransform: 'capitalize',
-    fontSize: 12,
-  },
-  dayCount: { display: 'block', color: '#c6ff32', marginTop: 6 },
-  achievementList: { display: 'grid', gap: 12 },
-  achievement: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 12,
-    alignItems: 'center',
-    background: '#0a0a0a',
-    border: '1px solid rgba(255,255,255,.06)',
-    borderRadius: 16,
-    padding: 14,
-  },
-  achievementIcon: { fontSize: 24 },
-  empty: { color: '#8a8a8a', padding: 20 },
-  routineList: { display: 'grid', gap: 14 },
-  routineCard: {
-    background: '#0d0d0d',
-    border: '1px solid #222',
-    borderRadius: 18,
-    padding: 20,
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 20,
-    alignItems: 'center',
-  },
-  routineTitle: { color: '#c6ff32', marginBottom: 8 },
-  routineDesc: { color: '#8a8a8a', marginBottom: 8 },
-  goal: { color: '#ddd', fontSize: 14 },
-  time: {
-    background: '#1b1b1b',
-    padding: '10px 14px',
-    borderRadius: 14,
-    color: '#c6ff32',
-    fontWeight: 700,
-    whiteSpace: 'nowrap',
-  },
-  sessionList: { display: 'grid', gap: 12 },
-  sessionCard: {
-    background: '#0d0d0d',
-    border: '1px solid #222',
-    borderRadius: 16,
-    padding: 18,
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 20,
-  },
-  sessionMinutes: { color: '#c6ff32', fontWeight: 800 },
+export default function AlumnoInicio() {
+  const [user, setUser]         = useState<any>(null)
+  const [rutinas, setRutinas]   = useState<any[]>([])
+  const [stats, setStats]       = useState<any>({})
+  const [loading, setLoading]   = useState(true)
+  const [sesionActiva, setSesionActiva] = useState<any>(null)
+  const [orgId, setOrgId]       = useState<number|null>(null)
+
+  useEffect(() => {
+    const sb = createClient()
+    sb.auth.getUser().then(async ({ data: { user: u } }) => {
+      if (!u) return
+      setUser(u)
+      // Obtener org del alumno
+      const { data: mem } = await sb.from('memberships').select('org_id').eq('user_id', u.id).eq('role','alumno').eq('status','active').single()
+      if (mem) setOrgId(mem.org_id)
+      const [r, s] = await Promise.all([
+        getRutinasAlumno(sb, u.id),
+        getEstadisticasAlumno(sb, u.id),
+      ])
+      setRutinas(r || [])
+      setStats(s || {})
+      setLoading(false)
+    })
+  }, [])
+
+  async function iniciarSesion(rutina: any) {
+    if (!orgId || !user) return
+    const sb  = createClient()
+    const ses = await createSesion(sb, orgId, user.id, rutina.id)
+    setSesionActiva({ ...ses, rutina })
+  }
+
+  function onSesionComplete() {
+    setSesionActiva(null)
+    // Refresh stats
+    const sb = createClient()
+    getEstadisticasAlumno(sb, user.id).then(setStats)
+  }
+
+  if (loading) return <div className="loader"><div className="spinner"/>Cargando...</div>
+
+  return (
+    <div>
+      <div className="page-title">MIS RUTINAS</div>
+      <div className="page-sub">Elegí tu rutina de hoy y empezá a entrenar</div>
+
+      {/* Stats */}
+      <div className="grid-4" style={{marginBottom:24}}>
+        {[
+          { label:'Sesiones totales', value:stats.total||0,       color:'#c8f542' },
+          { label:'Completadas',      value:stats.completadas||0,  color:'#4ade80' },
+          { label:'Consistencia',     value:`${stats.porcentaje||0}%`, color:'#60a5fa' },
+          { label:'Minutos totales',  value:stats.duracion||0,     color:'#fbbf24' },
+        ].map((s,i) => (
+          <div key={i} className="card">
+            <div style={{fontFamily:'"Bebas Neue",sans-serif',fontSize:36,color:s.color,lineHeight:1}}>{s.value}</div>
+            <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:1.5,color:'#666',marginTop:6}}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Rutinas */}
+      {rutinas.length === 0 ? (
+        <div className="card" style={{textAlign:'center',padding:'48px'}}>
+          <div style={{fontSize:44,marginBottom:12,opacity:0.2}}>💪</div>
+          <div style={{fontFamily:'"Bebas Neue",sans-serif',fontSize:22,color:'#444',marginBottom:8}}>SIN RUTINAS AÚN</div>
+          <div style={{fontSize:13,color:'#555'}}>Tu profe aún no asignó rutinas. ¡Ya vienen!</div>
+        </div>
+      ) : rutinas.map((r: any) => (
+        <div key={r.id} className="card" style={{marginBottom:16}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:16}}>
+            <div>
+              <div style={{fontFamily:'"Bebas Neue",sans-serif',fontSize:22,letterSpacing:2,color:'#c8f542'}}>{r.nombre}</div>
+              {r.descripcion && <div style={{fontSize:12,color:'#666',marginTop:2}}>{r.descripcion}</div>}
+              <div style={{fontSize:12,color:'#555',marginTop:4}}>{r.ejercicios?.length||0} ejercicios</div>
+            </div>
+            {sesionActiva?.rutina.id === r.id ? (
+              <span style={{padding:'8px 16px',background:'rgba(200,245,66,0.1)',border:'1px solid rgba(200,245,66,0.3)',borderRadius:8,color:'#c8f542',fontSize:13}}>▶ En curso</span>
+            ) : (
+              <button onClick={() => iniciarSesion(r)} disabled={!!sesionActiva}
+                style={{background:sesionActiva?'#333':'#c8f542',color:sesionActiva?'#666':'#070707',padding:'10px 20px',borderRadius:8,fontFamily:'"Bebas Neue",sans-serif',fontSize:15,letterSpacing:2,border:'none',cursor:sesionActiva?'not-allowed':'pointer'}}>
+                ▶ INICIAR
+              </button>
+            )}
+          </div>
+
+          {r.ejercicios?.sort((a: any,b: any)=>a.orden-b.orden).map((ej: any,i: number) => {
+            const isCurrent = sesionActiva?.rutina.id === r.id
+            return (
+              <div key={ej.id} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 12px',background:'rgba(255,255,255,0.03)',borderRadius:8,marginBottom:5}}>
+                <div style={{fontFamily:'"Bebas Neue",sans-serif',fontSize:18,color:'#c8f542',width:22,textAlign:'center'}}>{i+1}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:14,fontWeight:500}}>{ej.nombre}</div>
+                  <div style={{fontSize:11,color:'#666',marginTop:1}}>{ej.series} series{ej.reps?` · ${ej.reps}`:''}</div>
+                </div>
+                {isCurrent && ej.descanso_s > 0 && (
+                  <button onClick={() => {}}
+                    style={{fontSize:11,padding:'3px 8px',background:'rgba(251,191,36,0.1)',color:'#fbbf24',border:'none',borderRadius:6,cursor:'pointer'}}>
+                    ⏱ {ej.descanso_s}s
+                  </button>
+                )}
+                <span style={{fontSize:10,padding:'2px 7px',borderRadius:20,
+                  background:ej.tipo==='al_fallo'?'rgba(248,113,113,0.1)':'rgba(74,222,128,0.1)',
+                  color:ej.tipo==='al_fallo'?'#f87171':'#4ade80'}}>
+                  {ej.tipo==='al_fallo'?'Al fallo':ej.tipo==='tiempo'?'Por tiempo':'Por series'}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      ))}
+
+      {sesionActiva && <Timer sesionId={sesionActiva.id} orgId={orgId} onComplete={onSesionComplete}/>}
+    </div>
+  )
 }

@@ -1,80 +1,65 @@
 import { createClient } from '@/lib/supabase/server'
-
-async function safeCount(supabase: any, table: string, filter?: { column: string; value: string }) {
-  try {
-    let query = supabase.from(table).select('*', { count: 'exact', head: true })
-    if (filter) query = query.eq(filter.column, filter.value)
-    const { count } = await query
-    return count ?? 0
-  } catch {
-    return 0
-  }
-}
+import { redirect } from 'next/navigation'
+import { getPlatformKPIs, getOrgsOverview } from '@/lib/supabase/api'
+import { fmtCLP } from '@/lib/supabase/api'
 
 export default async function AdminPage() {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'admin') redirect('/dashboard')
 
-  const [academias, profes, alumnos, rutinas, sesiones, mensajes] = await Promise.all([
-    safeCount(supabase, 'academias'),
-    safeCount(supabase, 'profiles', { column: 'role', value: 'profe' }),
-    safeCount(supabase, 'profiles', { column: 'role', value: 'alumno' }),
-    safeCount(supabase, 'routines'),
-    safeCount(supabase, 'workout_sessions'),
-    safeCount(supabase, 'messages'),
-  ])
-
-  const cards = [
-    { label: 'Academias activas', value: academias, icon: '🏢', href: '/dashboard/admin/academias' },
-    { label: 'Coaches', value: profes, icon: '👨‍🏫', href: '/dashboard/admin/profes' },
-    { label: 'Alumnos', value: alumnos, icon: '👥', href: '/dashboard/admin/alumnos' },
-    { label: 'Rutinas creadas', value: rutinas, icon: '📋', href: '/dashboard/profe/rutinas' },
-    { label: 'Sesiones registradas', value: sesiones, icon: '✅', href: '/dashboard/admin/analytics' },
-    { label: 'Mensajes', value: mensajes, icon: '💬', href: '/dashboard/admin/analytics' },
-  ]
+  let kpis: any = {}
+  let orgs: any[] = []
+  try {
+    kpis = await getPlatformKPIs(supabase)
+    orgs = await getOrgsOverview(supabase) || []
+  } catch {}
 
   return (
     <div>
-      <div className="page-title">SUPER ADMIN</div>
-      <div className="page-sub">Control comercial y operacional de CALFIT</div>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
+        <div className="page-title" style={{marginBottom:0}}>PLATAFORMA</div>
+        <span style={{fontSize:11,padding:'3px 10px',borderRadius:20,background:'rgba(251,191,36,0.1)',color:'#fbbf24',letterSpacing:1,fontWeight:600}}>ADMIN</span>
+      </div>
+      <div className="page-sub">Vista global de CALFIT PRO</div>
 
-      <div className="grid-3" style={{ marginBottom: 22 }}>
-        {cards.map((card) => (
-          <a key={card.label} href={card.href} className="card" style={{ textDecoration: 'none', display: 'block' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-              <div>
-                <div style={{ color: '#666', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.5 }}>{card.label}</div>
-                <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 48, letterSpacing: 2, color: '#f0efe8', marginTop: 8 }}>{card.value}</div>
-              </div>
-              <div style={{ width: 42, height: 42, borderRadius: 14, background: 'rgba(200,245,66,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>
-                {card.icon}
-              </div>
-            </div>
-          </a>
+      <div className="grid-4" style={{marginBottom:24}}>
+        {[
+          { label:'MRR Plataforma',  value:fmtCLP(kpis?.mrr_plataforma_clp||0), color:'#c8f542', icon:'💰' },
+          { label:'Profes activos',  value:kpis?.orgs_activas||0, color:'#60a5fa', icon:'👨‍🏫' },
+          { label:'En trial',        value:kpis?.orgs_trial||0,   color:'#fbbf24', icon:'⏳' },
+          { label:'Alumnos totales', value:kpis?.total_alumnos||0, color:'#4ade80', icon:'🏋️' },
+        ].map((k,i) => (
+          <div key={i} className="card">
+            <div style={{fontSize:22,marginBottom:8,opacity:0.4}}>{k.icon}</div>
+            <div style={{fontFamily:'"Bebas Neue",sans-serif',fontSize:i===0?24:36,color:k.color,lineHeight:1}}>{k.value}</div>
+            <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:1.5,color:'#666',marginTop:6}}>{k.label}</div>
+          </div>
         ))}
       </div>
 
-      <div className="grid-2">
-        <div className="card">
-          <h2 style={{ fontFamily: 'Bebas Neue, sans-serif', letterSpacing: 2, fontSize: 28, marginBottom: 8 }}>Próximo paso comercial</h2>
-          <p style={{ color: '#777', fontSize: 14, lineHeight: 1.7 }}>
-            Crea academias demo para coaches reales. Cada academia tendrá código único para que alumnos y profesores se registren asociados a su comunidad.
-          </p>
-          <a href="/dashboard/admin/academias" className="btn btn-primary" style={{ marginTop: 18, textDecoration: 'none' }}>
-            Crear academia
-          </a>
-        </div>
-
-        <div className="card">
-          <h2 style={{ fontFamily: 'Bebas Neue, sans-serif', letterSpacing: 2, fontSize: 28, marginBottom: 8 }}>MVP vendible</h2>
-          <p style={{ color: '#777', fontSize: 14, lineHeight: 1.7 }}>
-            El flujo clave es: academia → coach → alumnos → rutinas → progreso. Si eso funciona, ya puedes mostrar demos y cerrar pilotos pagados.
-          </p>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 18 }}>
-            <span className="badge badge-lime">SaaS</span>
-            <span className="badge badge-success">Multi academia</span>
-            <span className="badge badge-warning">Early access</span>
+      <div className="card" style={{padding:0,overflow:'hidden'}}>
+        <div style={{padding:'12px 16px',borderBottom:'1px solid rgba(255,255,255,0.06)',fontSize:12,letterSpacing:1.5,textTransform:'uppercase',color:'#666'}}>Organizaciones recientes</div>
+        {orgs.slice(0,10).map((o: any, i: number) => (
+          <div key={o.org_id} style={{display:'grid',gridTemplateColumns:'1fr auto auto auto',gap:16,padding:'12px 16px',alignItems:'center',borderBottom:i<Math.min(orgs.length,10)-1?'1px solid rgba(255,255,255,0.04)':'none'}}>
+            <div>
+              <div style={{fontSize:13,fontWeight:500}}>{o.owner_name}</div>
+              <div style={{fontSize:11,color:'#666'}}>{o.owner_email}</div>
+            </div>
+            <span style={{fontSize:11,padding:'2px 8px',borderRadius:20,background:'rgba(200,245,66,0.1)',color:'#c8f542'}}>{o.plan_id?.toUpperCase()}</span>
+            <div style={{textAlign:'center'}}>
+              <div style={{fontFamily:'"Bebas Neue",sans-serif',fontSize:22,color:'#c8f542'}}>{o.total_alumnos||0}</div>
+              <div style={{fontSize:10,color:'#555'}}>alumnos</div>
+            </div>
+            <span style={{fontSize:11,padding:'2px 8px',borderRadius:20,
+              background:o.plan_status==='active'?'rgba(74,222,128,0.1)':o.plan_status==='trialing'?'rgba(96,165,250,0.1)':'rgba(248,113,113,0.1)',
+              color:o.plan_status==='active'?'#4ade80':o.plan_status==='trialing'?'#60a5fa':'#f87171'}}>
+              {o.plan_status}
+            </span>
           </div>
-        </div>
+        ))}
       </div>
     </div>
   )

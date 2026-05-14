@@ -1,41 +1,28 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import DashboardShell from '@/components/layout/DashboardShell'
+import Sidebar from '@/components/layout/Sidebar'
 import './dashboard.css'
 
-export default async function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/login')
-  }
+  if (!user) redirect('/login')
 
   const { data: profile } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
-    .maybeSingle()
+    .single()
 
-  if (!profile) {
-    return (
-      <div className="auth-error">
-        <h1>Usuario autenticado, pero sin perfil</h1>
-        <p>{user.email}</p>
-      </div>
-    )
-  }
+  if (!profile) redirect('/login')
 
   return (
-    <DashboardShell profile={profile}>
-      {children}
-    </DashboardShell>
+    <div className="app-shell">
+      <Sidebar profile={profile} />
+      <div className="main-content">
+        {children}
+      </div>
+    </div>
   )
 }

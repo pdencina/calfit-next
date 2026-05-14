@@ -1,337 +1,147 @@
 'use client'
-
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { getConversaciones, getMessages, sendMessage } from '@/lib/supabase/api'
 
-type Conversation = {
-  id: number
-  org_id: number
-  profe_id: string
-  alumno_id: string
-  last_message_at: string
-}
-
-type Message = {
-  id: number
-  conversation_id: number
-  sender_id: string
-  content: string
-  created_at: string
-}
-
-type Profile = {
-  id: string
-  full_name: string
-  email: string
-}
-
-export default function AlumnoMensajesPage() {
-  const supabase = useMemo(() => createClient(), [])
-  const bottomRef = useRef<HTMLDivElement | null>(null)
-
-  const [userId, setUserId] = useState('')
-  const [conversation, setConversation] = useState<Conversation | null>(null)
-  const [messages, setMessages] = useState<Message[]>([])
-  const [coach, setCoach] = useState<Profile | null>(null)
-  const [content, setContent] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(true)
+export default function MensajesAlumno() {
+  const [userId, setUserId]     = useState('')
+  const [convos, setConvos]     = useState<any[]>([])
+  const [active, setActive]     = useState<any>(null)
+  const [messages, setMessages] = useState<any[]>([])
+  const [newMsg, setNewMsg]     = useState('')
+  const [sending, setSending]   = useState(false)
+  const [loading, setLoading]   = useState(true)
+  const endRef = useRef<HTMLDivElement>(null)
+  const channelRef = useRef<any>(null)
 
   useEffect(() => {
-    load()
+    const sb = createClient()
+    sb.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      setUserId(user.id)
+      const c = await getConversaciones(sb, user.id)
+      setConvos(c || [])
+      if (c && c.length > 0) openConvo(c[0], user.id, sb)
+      setLoading(false)
+    })
   }, [])
 
-  useEffect(() => {
-    if (!conversation) return
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
-    loadMessages(conversation.id)
-
-    const channel = supabase
-      .channel(`student-messages-${conversation.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `conversation_id=eq.${conversation.id}`,
-        },
-        (payload) => {
-          setMessages((prev) => [...prev, payload.new as Message])
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [conversation?.id])
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({
-      behavior: 'smooth',
-    })
-  }, [messages])
-
-  async function load() {
-    setLoading(true)
-    setError('')
-
-    const { data: auth } = await supabase.auth.getUser()
-    const uid = auth.user?.id
-
-    if (!uid) {
-      setError('Sesión no encontrada')
-      setLoading(false)
-      return
-    }
-
-    setUserId(uid)
-
-    const { data: conv, error: convError } = await supabase
-      .from('conversations')
-      .select('*')
-      .eq('alumno_id', uid)
-      .order('last_message_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (convError) {
-      setError(convError.message)
-      setLoading(false)
-      return
-    }
-
-    if (!conv) {
-      setLoading(false)
-      return
-    }
-
-    setConversation(conv as Conversation)
-
-    const { data: prof } = await supabase
-      .from('profiles')
-      .select('id,full_name,email')
-      .eq('id', conv.profe_id)
-      .maybeSingle()
-
-    setCoach((prof as Profile) || null)
-
-    await loadMessages(conv.id)
-
-    setLoading(false)
+  async function openConvo(convo: any, uid?: string, sbClient?: any) {
+    const sb  = sbClient || createClient()
+    const me  = uid || userId
+    setActive(convo)
+    const msgs = await getMessages(sb, convo.id)
+    setMessages(msgs || [])
+    if (channelRef.current) channelRef.current.unsubscribe()
+    channelRef.current = sb.channel(`conv-alumno-${convo.id}`)
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'messages', filter:`conversation_id=eq.${convo.id}` },
+        (payload: any) => setMessages(prev => prev.some(m => m.id === payload.new.id) ? prev : [...prev, payload.new])
+      ).subscribe()
   }
 
-  async function loadMessages(conversationId: number) {
-    const { data, error: msgError } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('conversation_id', conversationId)
-      .order('created_at')
-
-    if (msgError) {
-      setError(msgError.message)
-    } else {
-      setMessages((data || []) as Message[])
-    }
-  }
-
-  async function sendMessage(e: React.FormEvent) {
+  async function handleSend(e: React.FormEvent) {
     e.preventDefault()
-
-    if (!conversation || !content.trim()) return
-
-    const text = content.trim()
-
-    setContent('')
-
-    const { error: sendError } = await supabase
-      .from('messages')
-      .insert({
-        conversation_id: conversation.id,
-        sender_id: userId,
-        content: text,
-      })
-
-    if (sendError) {
-      setError(sendError.message)
-      setContent(text)
-    }
+    if (!newMsg.trim() || !active || sending) return
+    setSending(true)
+    try {
+      const sb  = createClient()
+      const msg = await sendMessage(sb, active.id, userId, newMsg.trim())
+      setMessages(prev => [...prev, msg])
+      setNewMsg('')
+    } catch {}
+    finally { setSending(false) }
   }
 
-  if (loading) {
-    return <div className="loader">Cargando mensajes...</div>
-  }
+  const init = (n: string) => n?.split(' ').map((w: string) => w[0]).join('').slice(0,2).toUpperCase() || '??'
+
+  if (loading) return <div className="loader"><div className="spinner"/>Cargando...</div>
+
+  if (convos.length === 0) return (
+    <div>
+      <div className="page-title">MENSAJES</div>
+      <div className="empty" style={{marginTop:40}}>
+        <div className="empty-icon">💬</div>
+        <div className="empty-title">SIN MENSAJES</div>
+        <div className="empty-sub">Tu profe aún no inició una conversación contigo</div>
+      </div>
+    </div>
+  )
 
   return (
     <div>
       <div className="page-title">MENSAJES</div>
-      <div className="page-sub">Comunicación directa con tu profesor.</div>
+      <div className="page-sub">Chat con tu entrenador</div>
 
-      {error && (
-        <div className="alert-error" style={{ marginBottom: 16 }}>
-          {error}
-        </div>
-      )}
+      <div style={{display:'grid',gridTemplateColumns:'240px 1fr',gap:0,border:'1px solid rgba(255,255,255,0.07)',borderRadius:14,overflow:'hidden',height:'calc(100vh - 180px)'}}>
 
-      {!conversation ? (
-        <div
-          className="card"
-          style={{
-            textAlign: 'center',
-            padding: 60,
-            color: '#666',
-          }}
-        >
-          <div style={{ fontSize: 46, marginBottom: 18 }}>💬</div>
-          <h2 style={{ color: '#c8f542', marginBottom: 10 }}>
-            Aún no tienes una conversación activa
-          </h2>
-          <p>
-            Tu profesor puede iniciar una conversación desde su panel.
-          </p>
-        </div>
-      ) : (
-        <div
-          className="card"
-          style={{
-            minHeight: 620,
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-          <div
-            style={{
-              paddingBottom: 14,
-              borderBottom: '1px solid rgba(255,255,255,0.06)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              gap: 16,
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontFamily: 'Bebas Neue',
-                  letterSpacing: 2,
-                  fontSize: 28,
-                }}
-              >
-                {coach?.full_name || 'Profesor'}
-              </div>
-
-              <div style={{ color: '#666', fontSize: 12 }}>
-                {coach?.email}
-              </div>
-            </div>
-
-            <div
-              style={{
-                color: '#00ff88',
-                fontSize: 12,
-                fontWeight: 700,
-              }}
-            >
-              ● online
-            </div>
-          </div>
-
-          <div
-            style={{
-              flex: 1,
-              padding: '18px 0',
-              overflowY: 'auto',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 10,
-            }}
-          >
-            {messages.map((m) => {
-              const own = m.sender_id === userId
-
-              return (
-                <div
-                  key={m.id}
-                  style={{
-                    alignSelf: own ? 'flex-end' : 'flex-start',
-                    maxWidth: '72%',
-                  }}
-                >
-                  <div
-                    style={{
-                      background: own ? '#c8f542' : '#222',
-                      color: own ? '#070707' : '#f0efe8',
-                      padding: '12px 16px',
-                      borderRadius: 16,
-                      fontSize: 14,
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    {m.content}
-                  </div>
-
-                  <div
-                    style={{
-                      color: '#555',
-                      fontSize: 10,
-                      marginTop: 4,
-                      textAlign: own ? 'right' : 'left',
-                    }}
-                  >
-                    {new Date(m.created_at).toLocaleString()}
-                  </div>
+        {/* Conversaciones */}
+        <div style={{background:'#111',borderRight:'1px solid rgba(255,255,255,0.06)'}}>
+          {convos.map((c: any) => {
+            const other = c.profe
+            const isAct = active?.id === c.id
+            return (
+              <div key={c.id} onClick={() => openConvo(c)}
+                style={{display:'flex',alignItems:'center',gap:10,padding:'13px 16px',cursor:'pointer',
+                  background:isAct?'rgba(200,245,66,0.05)':'transparent',
+                  borderLeft:`2px solid ${isAct?'#c8f542':'transparent'}`,transition:'all 0.15s'}}>
+                <div style={{width:34,height:34,borderRadius:'50%',background:'#c8f542',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,color:'#070707',flexShrink:0}}>{init(other?.full_name)}</div>
+                <div>
+                  <div style={{fontSize:13,fontWeight:500}}>{other?.full_name}</div>
+                  <div style={{fontSize:11,color:'#555'}}>Tu entrenador</div>
                 </div>
-              )
-            })}
-
-            {!messages.length && (
-              <div
-                style={{
-                  color: '#555',
-                  textAlign: 'center',
-                  marginTop: 80,
-                }}
-              >
-                Sin mensajes aún.
               </div>
-            )}
-
-            <div ref={bottomRef} />
-          </div>
-
-          <form
-            onSubmit={sendMessage}
-            style={{
-              display: 'flex',
-              gap: 10,
-              borderTop: '1px solid rgba(255,255,255,0.06)',
-              paddingTop: 14,
-            }}
-          >
-            <input
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Escribe un mensaje..."
-              style={field}
-            />
-
-            <button className="btn btn-primary">
-              ENVIAR
-            </button>
-          </form>
+            )
+          })}
         </div>
-      )}
+
+        {/* Chat */}
+        {active ? (
+          <div style={{display:'flex',flexDirection:'column',background:'#0a0a0a'}}>
+            <div style={{padding:'14px 20px',borderBottom:'1px solid rgba(255,255,255,0.06)',background:'#111',display:'flex',alignItems:'center',gap:10}}>
+              <div style={{width:32,height:32,borderRadius:'50%',background:'#c8f542',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:'#070707'}}>
+                {init(active.profe?.full_name)}
+              </div>
+              <div style={{fontSize:14,fontWeight:500}}>{active.profe?.full_name}</div>
+            </div>
+            <div style={{flex:1,overflowY:'auto',padding:'16px 20px'}}>
+              {messages.length === 0 && <div style={{textAlign:'center',color:'#444',fontSize:13,marginTop:40}}>Empezá la conversación 👋</div>}
+              {messages.map((m: any) => {
+                const isMe = m.sender_id === userId
+                return (
+                  <div key={m.id} style={{display:'flex',justifyContent:isMe?'flex-end':'flex-start',marginBottom:8}}>
+                    <div style={{maxWidth:'70%',padding:'10px 14px',
+                      background:isMe?'#c8f542':'#1e1e1e',
+                      color:isMe?'#070707':'#f0efe8',
+                      borderRadius:isMe?'16px 16px 4px 16px':'16px 16px 16px 4px',
+                      fontSize:14,lineHeight:1.5}}>
+                      {m.content}
+                      <div style={{fontSize:10,opacity:0.5,textAlign:'right',marginTop:4}}>
+                        {new Date(m.created_at).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+              <div ref={endRef}/>
+            </div>
+            <form onSubmit={handleSend} style={{padding:'14px 20px',borderTop:'1px solid rgba(255,255,255,0.06)',display:'flex',gap:10}}>
+              <input value={newMsg} onChange={e=>setNewMsg(e.target.value)}
+                placeholder="Escribí tu mensaje..."
+                style={{flex:1,background:'#1a1a1a',border:'1px solid rgba(255,255,255,0.08)',borderRadius:8,padding:'10px 14px',color:'#f0efe8',fontSize:14,outline:'none'}}
+                onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey)handleSend(e)}}/>
+              <button type="submit" className="btn btn-primary" disabled={!newMsg.trim()||sending} style={{fontSize:15,padding:'10px 18px'}}>
+                {sending?'...':'↑'}
+              </button>
+            </form>
+          </div>
+        ) : (
+          <div style={{display:'flex',alignItems:'center',justifyContent:'center',color:'#444',fontSize:13}}>
+            Seleccioná una conversación
+          </div>
+        )}
+      </div>
     </div>
   )
-}
-
-const field: React.CSSProperties = {
-  width: '100%',
-  padding: '12px 14px',
-  background: '#222',
-  border: '1px solid rgba(255,255,255,0.08)',
-  borderRadius: 12,
-  color: '#f0efe8',
-  outline: 'none',
 }

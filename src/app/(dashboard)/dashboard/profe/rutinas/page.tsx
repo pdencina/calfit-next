@@ -1,913 +1,229 @@
 'use client'
-
-import { useEffect, useMemo, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { getAlumnos, getRutinasAlumno, createRutina, deleteRutina, createEjercicio, deleteEjercicio } from '@/lib/supabase/api'
 
-type Profile = {
-  id: string
-  email: string | null
-  full_name: string | null
-  role: string | null
-  academia_id: string | null
-}
+const TIPOS = [
+  { value: 'al_fallo', label: 'Al fallo' },
+  { value: 'series',   label: 'Por series' },
+  { value: 'tiempo',   label: 'Por tiempo' },
+]
 
-type Routine = {
-  id: string
-  titulo: string
-  descripcion: string | null
-  nivel?: string | null
-  categoria?: string | null
-  objetivo?: string | null
-  duracion_min?: number | null
-  is_template?: boolean | null
-  template_source_id?: string | null
-  profe_id?: string | null
-  academia_id?: string | null
-}
-
-type Exercise = {
-  id: string
-  routine_id: string
-  nombre: string
-  sets: number | null
-  reps: number | null
-  descanso: number | null
-  video_url?: string | null
-  orden?: number | null
-  notas?: string | null
-}
-
-export default function ProfeRutinasPage() {
-  const supabase = createClient()
-
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [students, setStudents] = useState<Profile[]>([])
-  const [templates, setTemplates] = useState<Routine[]>([])
-  const [myRoutines, setMyRoutines] = useState<Routine[]>([])
-  const [exercises, setExercises] = useState<Exercise[]>([])
-
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState('')
-  const [error, setError] = useState('')
-  const [search, setSearch] = useState('')
-  const [levelFilter, setLevelFilter] = useState('Todos')
-
-  const [selectedRoutineId, setSelectedRoutineId] = useState('')
-  const [selectedStudentId, setSelectedStudentId] = useState('')
-
-  const [customTitle, setCustomTitle] = useState('')
-  const [customDescription, setCustomDescription] = useState('')
-
-  const [editingExerciseId, setEditingExerciseId] = useState<string | null>(null)
-  const [editName, setEditName] = useState('')
-  const [editSets, setEditSets] = useState('')
-  const [editReps, setEditReps] = useState('')
-  const [editRest, setEditRest] = useState('')
-  const [editVideo, setEditVideo] = useState('')
-
-  async function loadData() {
-    setLoading(true)
-
-    const { data: userData } = await supabase.auth.getUser()
-    const user = userData.user
-
-    if (!user) {
-      window.location.href = '/login'
-      return
-    }
-
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
-
-    setProfile(profileData)
-
-    const { data: studentsData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('role', 'alumno')
-      .eq('academia_id', profileData.academia_id)
-
-    setStudents(studentsData || [])
-
-    const { data: templateData } = await supabase
-      .from('routines')
-      .select('*')
-      .eq('is_template', true)
-      .order('titulo')
-
-    setTemplates(templateData || [])
-
-    const { data: routinesData } = await supabase
-      .from('routines')
-      .select('*')
-      .eq('profe_id', user.id)
-      .eq('is_template', false)
-      .order('created_at', { ascending: false })
-
-    setMyRoutines(routinesData || [])
-
-    const allIds = [
-      ...(templateData || []).map((r) => r.id),
-      ...(routinesData || []).map((r) => r.id),
-    ]
-
-    if (allIds.length > 0) {
-      const { data: exData } = await supabase
-        .from('routine_exercises')
-        .select('*')
-        .in('routine_id', allIds)
-        .order('orden')
-
-      setExercises(exData || [])
-    } else {
-      setExercises([])
-    }
-
-    setLoading(false)
-  }
+export default function RutinasPage() {
+  const [org, setOrg]             = useState<any>(null)
+  const [profeId, setProfeId]     = useState('')
+  const [alumnos, setAlumnos]     = useState<any[]>([])
+  const [selected, setSelected]   = useState<any>(null)
+  const [rutinas, setRutinas]     = useState<any[]>([])
+  const [loading, setLoading]     = useState(true)
+  const [showNewRutina, setShowNewRutina] = useState(false)
+  const [newNombre, setNewNombre] = useState('')
+  const [newCat, setNewCat]       = useState('general')
+  const [newDesc, setNewDesc]     = useState('')
+  const [activeRutina, setActiveRutina] = useState<number|null>(null)
+  const [showEjForm, setShowEjForm] = useState(false)
+  const [ejForm, setEjForm]       = useState({ nombre:'', tipo:'al_fallo', series:4, reps:'', descanso_s:90, notas:'' })
+  const [saving, setSaving]       = useState(false)
+  const [msg, setMsg]             = useState('')
 
   useEffect(() => {
-    loadData()
+    const sb = createClient()
+    sb.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      setProfeId(user.id)
+      const { data: o } = await sb.from('organizations').select('*, plans(*)').eq('owner_id', user.id).single()
+      setOrg(o)
+      if (o) {
+        const data = await getAlumnos(sb, o.id)
+        setAlumnos(data || [])
+        const params = new URLSearchParams(window.location.search)
+        const aid = params.get('alumno')
+        if (aid) {
+          const found = data?.find((a: any) => a.id === aid)
+          if (found) loadRutinas(sb, found)
+        }
+      }
+      setLoading(false)
+    })
   }, [])
 
-  const filteredTemplates = useMemo(() => {
-    return templates.filter((r) => {
-      const q = search.toLowerCase()
-
-      const matchesSearch =
-        r.titulo?.toLowerCase().includes(q) ||
-        r.descripcion?.toLowerCase().includes(q) ||
-        r.categoria?.toLowerCase().includes(q) ||
-        r.objetivo?.toLowerCase().includes(q)
-
-      const matchesLevel =
-        levelFilter === 'Todos' ||
-        r.nivel === levelFilter
-
-      return matchesSearch && matchesLevel
-    })
-  }, [templates, search, levelFilter])
-
-  function getExercises(routineId: string) {
-    return exercises
-      .filter((e) => e.routine_id === routineId)
-      .sort((a, b) => (a.orden || 0) - (b.orden || 0))
+  async function loadRutinas(sb: any, alumno: any) {
+    setSelected(alumno)
+    const data = await getRutinasAlumno(sb, alumno.id).catch(() => [])
+    setRutinas(data || [])
   }
 
-  function alreadyUsed(templateId: string) {
-    return myRoutines.some(
-      (r) => r.template_source_id === templateId
-    )
-  }
-
-  async function createFromTemplate(templateId: string) {
-    if (!profile) return
-
+  async function handleCreateRutina(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selected || !org) return
     setSaving(true)
-    setError('')
-    setMessage('')
-
-    const template = templates.find((r) => r.id === templateId)
-
-    if (!template) {
-      setSaving(false)
-      return
-    }
-
-    if (alreadyUsed(templateId)) {
-      setError('Ya agregaste esta plantilla.')
-      setSaving(false)
-      return
-    }
-
-    const { data: newRoutine, error } = await supabase
-      .from('routines')
-      .insert({
-        titulo: template.titulo,
-        descripcion: template.descripcion,
-        nivel: template.nivel,
-        categoria: template.categoria,
-        objetivo: template.objetivo,
-        duracion_min: template.duracion_min,
-        template_source_id: template.id,
-        is_template: false,
-        profe_id: profile.id,
-        academia_id: profile.academia_id,
-      })
-      .select('*')
-      .single()
-
-    if (error || !newRoutine) {
-      setError(error?.message || 'Error al crear rutina.')
-      setSaving(false)
-      return
-    }
-
-    const templateExercises = getExercises(template.id)
-
-    if (templateExercises.length > 0) {
-      const payload = templateExercises.map((e) => ({
-        routine_id: newRoutine.id,
-        nombre: e.nombre,
-        sets: e.sets,
-        reps: e.reps,
-        descanso: e.descanso,
-        video_url: e.video_url,
-        orden: e.orden,
-        notas: e.notas,
-      }))
-
-      await supabase
-        .from('routine_exercises')
-        .insert(payload)
-    }
-
-    setSelectedRoutineId(newRoutine.id)
-    setMessage('Rutina agregada.')
-    await loadData()
-    setSaving(false)
+    try {
+      const sb = createClient()
+      const r  = await createRutina(sb, org.id, selected.id, profeId, { nombre: newNombre, descripcion: newDesc, categoria: newCat })
+      setRutinas(p => [...p, { ...r, ejercicios: [] }])
+      setNewNombre(''); setNewDesc(''); setShowNewRutina(false)
+      setMsg('✓ Rutina creada')
+      setTimeout(() => setMsg(''), 3000)
+    } catch (err: any) { setMsg('Error: ' + err.message) }
+    finally { setSaving(false) }
   }
 
-  async function createCustomRoutine() {
-    if (!profile || !customTitle.trim()) return
+  async function handleDeleteRutina(id: number) {
+    if (!confirm('¿Eliminar esta rutina?')) return
+    await deleteRutina(createClient(), id)
+    setRutinas(p => p.filter(r => r.id !== id))
+  }
 
+  async function handleAddEj(e: React.FormEvent) {
+    e.preventDefault()
+    if (!activeRutina) return
     setSaving(true)
-    setError('')
-    setMessage('')
-
-    const { error } = await supabase
-      .from('routines')
-      .insert({
-        titulo: customTitle.trim(),
-        descripcion: customDescription.trim() || null,
-        is_template: false,
-        profe_id: profile.id,
-        academia_id: profile.academia_id,
-      })
-
-    if (error) {
-      setError(error.message)
-      setSaving(false)
-      return
-    }
-
-    setCustomTitle('')
-    setCustomDescription('')
-    setMessage('Rutina creada.')
-    await loadData()
-    setSaving(false)
+    try {
+      const ej = await createEjercicio(createClient(), activeRutina, ejForm)
+      setRutinas(p => p.map(r => r.id === activeRutina ? { ...r, ejercicios: [...(r.ejercicios||[]), ej] } : r))
+      setEjForm({ nombre:'', tipo:'al_fallo', series:4, reps:'', descanso_s:90, notas:'' })
+      setShowEjForm(false); setActiveRutina(null)
+    } catch (err: any) { setMsg('Error: ' + err.message) }
+    finally { setSaving(false) }
   }
 
-  async function assignRoutine() {
-    if (!selectedRoutineId || !selectedStudentId) {
-      setError('Selecciona rutina y alumno.')
-      return
-    }
-
-    setSaving(true)
-    setError('')
-    setMessage('')
-
-    const { error } = await supabase
-      .from('student_routines')
-      .insert({
-        routine_id: selectedRoutineId,
-        student_id: selectedStudentId,
-      })
-
-    if (error) {
-      if (error.code === '23505') {
-        setError('Esta rutina ya está asignada.')
-      } else {
-        setError(error.message)
-      }
-
-      setSaving(false)
-      return
-    }
-
-    setMessage('Rutina asignada.')
-    setSaving(false)
+  async function handleDeleteEj(rutinaId: number, ejId: number) {
+    await deleteEjercicio(createClient(), ejId)
+    setRutinas(p => p.map(r => r.id === rutinaId ? { ...r, ejercicios: r.ejercicios.filter((e: any) => e.id !== ejId) } : r))
   }
 
-  function startEditExercise(exercise: Exercise) {
-    setEditingExerciseId(exercise.id)
-    setEditName(exercise.nombre)
-    setEditSets(String(exercise.sets || 3))
-    setEditReps(String(exercise.reps || 10))
-    setEditRest(String(exercise.descanso || 60))
-    setEditVideo(exercise.video_url || '')
-  }
+  const init = (n: string) => n?.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase() || '??'
 
-  function cancelEditExercise() {
-    setEditingExerciseId(null)
-    setEditName('')
-    setEditSets('')
-    setEditReps('')
-    setEditRest('')
-    setEditVideo('')
-  }
-
-  async function saveExercise(exerciseId: string) {
-    if (!editName.trim()) {
-      setError('El ejercicio necesita un nombre.')
-      return
-    }
-
-    setSaving(true)
-    setError('')
-    setMessage('')
-
-    const { error } = await supabase
-      .from('routine_exercises')
-      .update({
-        nombre: editName.trim(),
-        sets: Number(editSets) || 1,
-        reps: Number(editReps) || 1,
-        descanso: Number(editRest) || 60,
-        video_url: editVideo.trim() || null,
-      })
-      .eq('id', exerciseId)
-
-    if (error) {
-      setError(error.message)
-      setSaving(false)
-      return
-    }
-
-    cancelEditExercise()
-    setMessage('Ejercicio actualizado.')
-    await loadData()
-    setSaving(false)
-  }
-
-  async function deleteExercise(exerciseId: string) {
-    const confirmDelete = window.confirm('¿Eliminar ejercicio?')
-
-    if (!confirmDelete) return
-
-    setSaving(true)
-    setError('')
-    setMessage('')
-
-    const { error } = await supabase
-      .from('routine_exercises')
-      .delete()
-      .eq('id', exerciseId)
-
-    if (error) {
-      setError(error.message)
-      setSaving(false)
-      return
-    }
-
-    setMessage('Ejercicio eliminado.')
-    await loadData()
-    setSaving(false)
-  }
-
-  async function deleteRoutine(routineId: string) {
-    const confirmDelete = window.confirm(
-      '¿Seguro que quieres eliminar esta rutina? También se eliminarán sus ejercicios y asignaciones.'
-    )
-
-    if (!confirmDelete) return
-
-    setSaving(true)
-    setError('')
-    setMessage('')
-
-    const { error } = await supabase
-      .from('routines')
-      .delete()
-      .eq('id', routineId)
-      .eq('profe_id', profile?.id)
-
-    if (error) {
-      setError(error.message)
-      setSaving(false)
-      return
-    }
-
-    setMessage('Rutina eliminada.')
-    await loadData()
-    setSaving(false)
-  }
-
-  if (loading) {
-    return (
-      <div style={styles.page}>
-        Cargando...
-      </div>
-    )
-  }
+  if (loading) return <div className="loader"><div className="spinner"/>Cargando...</div>
 
   return (
-    <div style={styles.page}>
-      <div style={styles.header}>
-        <div>
-          <h1 style={styles.title}>Rutinas</h1>
-          <p style={styles.subtitle}>Biblioteca inteligente CALFIT</p>
+    <div>
+      <div className="page-title">RUTINAS</div>
+      <div className="page-sub">Diseñá rutinas personalizadas para cada alumno</div>
+      {msg && <div className="alert alert-success" style={{marginBottom:16}}>{msg}</div>}
+
+      <div style={{display:'grid',gridTemplateColumns:'240px 1fr',gap:20,alignItems:'start'}}>
+
+        {/* Alumnos */}
+        <div className="card" style={{padding:0,overflow:'hidden'}}>
+          <div style={{padding:'12px 16px',borderBottom:'1px solid rgba(255,255,255,0.06)',fontSize:11,letterSpacing:2,textTransform:'uppercase',color:'#666'}}>Alumnos</div>
+          {alumnos.length === 0 && (
+            <div style={{padding:'24px 16px',textAlign:'center',color:'#444',fontSize:13}}>
+              Sin alumnos.<br/><a href="/dashboard/profe/alumnos" style={{color:'#c8f542',fontSize:12}}>Invitá uno →</a>
+            </div>
+          )}
+          {alumnos.map((a: any) => (
+            <div key={a.id} onClick={() => loadRutinas(createClient(), a)}
+              style={{display:'flex',alignItems:'center',gap:10,padding:'11px 16px',cursor:'pointer',
+                background:selected?.id===a.id?'rgba(200,245,66,0.05)':'transparent',
+                borderLeft:`2px solid ${selected?.id===a.id?'#c8f542':'transparent'}`,transition:'all 0.15s'}}>
+              <div style={{width:30,height:30,borderRadius:'50%',background:'#c8f542',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:'#070707',flexShrink:0}}>{init(a.full_name)}</div>
+              <div style={{minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.full_name}</div>
+              </div>
+            </div>
+          ))}
         </div>
 
-        <button style={styles.refresh} onClick={loadData}>
-          Actualizar
-        </button>
-      </div>
-
-      {message && <div style={styles.success}>{message}</div>}
-      {error && <div style={styles.error}>{error}</div>}
-
-      <div style={styles.filters}>
-        <input
-          style={styles.input}
-          placeholder="Buscar rutina..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-
-        <select
-          style={styles.select}
-          value={levelFilter}
-          onChange={(e) => setLevelFilter(e.target.value)}
-        >
-          <option>Todos</option>
-          <option>Principiante</option>
-          <option>Intermedio</option>
-          <option>Avanzado</option>
-        </select>
-      </div>
-
-      <div style={styles.templatesGrid}>
-        {filteredTemplates.map((routine) => (
-          <div key={routine.id} style={styles.card}>
-            <div style={styles.tags}>
-              <span style={styles.badge}>{routine.nivel}</span>
-              <span style={styles.darkBadge}>{routine.categoria}</span>
+        {/* Rutinas */}
+        <div>
+          {!selected ? (
+            <div className="card" style={{textAlign:'center',padding:'48px 20px'}}>
+              <div style={{fontSize:40,marginBottom:12,opacity:0.2}}>📋</div>
+              <div style={{fontFamily:'"Bebas Neue",sans-serif',fontSize:20,color:'#444',marginBottom:8}}>SELECCIONÁ UN ALUMNO</div>
+              <div style={{fontSize:13,color:'#555'}}>Elegí un alumno para ver y editar sus rutinas</div>
             </div>
-
-            <h2 style={styles.cardTitle}>{routine.titulo}</h2>
-
-            <p style={styles.description}>{routine.descripcion}</p>
-
-            <p style={styles.meta}>🎯 {routine.objetivo}</p>
-
-            <p style={styles.meta}>
-              ⏱️ {routine.duracion_min} min · {getExercises(routine.id).length}{' '}
-              ejercicios
-            </p>
-
-            <details>
-              <summary style={{ cursor: 'pointer' }}>Ver ejercicios</summary>
-
-              <div style={{ marginTop: 12 }}>
-                {getExercises(routine.id).map((e) => (
-                  <div key={e.id} style={styles.exercise}>
-                    <strong>{e.nombre}</strong>
-                    <span>
-                      {e.sets}x{e.reps}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </details>
-
-            <button
-              style={{
-                ...styles.button,
-                opacity: alreadyUsed(routine.id) ? 0.4 : 1,
-              }}
-              disabled={saving || alreadyUsed(routine.id)}
-              onClick={() => createFromTemplate(routine.id)}
-            >
-              {alreadyUsed(routine.id) ? 'Ya agregada' : 'Usar plantilla'}
-            </button>
-          </div>
-        ))}
-      </div>
-
-      <div style={styles.section}>
-        <h2 style={styles.sectionTitle}>Asignar rutina</h2>
-
-        <select
-          style={styles.select}
-          value={selectedRoutineId}
-          onChange={(e) => setSelectedRoutineId(e.target.value)}
-        >
-          <option value="">Seleccionar rutina</option>
-
-          {myRoutines.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.titulo}
-            </option>
-          ))}
-        </select>
-
-        <select
-          style={styles.select}
-          value={selectedStudentId}
-          onChange={(e) => setSelectedStudentId(e.target.value)}
-        >
-          <option value="">Seleccionar alumno</option>
-
-          {students.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.full_name || s.email}
-            </option>
-          ))}
-        </select>
-
-        <button style={styles.button} onClick={assignRoutine}>
-          Asignar rutina
-        </button>
-      </div>
-
-      <div style={styles.section}>
-        <h2 style={styles.sectionTitle}>Crear rutina personalizada</h2>
-
-        <input
-          style={styles.input}
-          placeholder="Nombre"
-          value={customTitle}
-          onChange={(e) => setCustomTitle(e.target.value)}
-        />
-
-        <textarea
-          style={styles.textarea}
-          placeholder="Descripción"
-          value={customDescription}
-          onChange={(e) => setCustomDescription(e.target.value)}
-        />
-
-        <button style={styles.button} onClick={createCustomRoutine}>
-          Crear rutina
-        </button>
-      </div>
-
-      <div style={styles.section}>
-        <h2 style={styles.sectionTitle}>Mis rutinas creadas</h2>
-
-        {myRoutines.map((r) => (
-          <div key={r.id} style={styles.myRoutine}>
-            <div style={styles.routineHeader}>
-              <div>
-                <h3 style={{ color: '#c6ff32' }}>{r.titulo}</h3>
-                <p style={{ color: '#8a8a8a' }}>{r.descripcion}</p>
+          ) : (
+            <>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+                <div>
+                  <div style={{fontFamily:'"Bebas Neue",sans-serif',fontSize:20,letterSpacing:2,color:'#c8f542'}}>{selected.full_name}</div>
+                  <div style={{fontSize:12,color:'#666'}}>{rutinas.length} rutina{rutinas.length!==1?'s':''}</div>
+                </div>
+                <button className="btn btn-primary" onClick={() => setShowNewRutina(!showNewRutina)}>+ Nueva rutina</button>
               </div>
 
-              <div style={styles.actionsRow}>
-                <span style={styles.badge}>
-                  {getExercises(r.id).length} ejercicios
-                </span>
-
-                <button
-                  onClick={() => deleteRoutine(r.id)}
-                  style={styles.deleteButton}
-                >
-                  Eliminar rutina
-                </button>
-              </div>
-            </div>
-
-            <div style={styles.exerciseEditor}>
-              {getExercises(r.id).map((e) => (
-                <div key={e.id} style={styles.exerciseBox}>
-                  {editingExerciseId === e.id ? (
-                    <>
-                      <input
-                        style={styles.input}
-                        value={editName}
-                        onChange={(ev) => setEditName(ev.target.value)}
-                        placeholder="Nombre ejercicio"
-                      />
-
-                      <div style={styles.editGrid}>
-                        <input
-                          style={styles.input}
-                          value={editSets}
-                          onChange={(ev) => setEditSets(ev.target.value)}
-                          placeholder="Sets"
-                        />
-
-                        <input
-                          style={styles.input}
-                          value={editReps}
-                          onChange={(ev) => setEditReps(ev.target.value)}
-                          placeholder="Reps"
-                        />
-
-                        <input
-                          style={styles.input}
-                          value={editRest}
-                          onChange={(ev) => setEditRest(ev.target.value)}
-                          placeholder="Descanso"
-                        />
-                      </div>
-
-                      <input
-                        style={styles.input}
-                        placeholder="Video URL"
-                        value={editVideo}
-                        onChange={(ev) => setEditVideo(ev.target.value)}
-                      />
-
-                      <div style={styles.actionsRow}>
-                        <button
-                          style={styles.button}
-                          onClick={() => saveExercise(e.id)}
-                        >
-                          Guardar
-                        </button>
-
-                        <button
-                          style={styles.deleteButton}
-                          onClick={cancelEditExercise}
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <div style={styles.exerciseView}>
-                      <div>
-                        <strong>{e.nombre}</strong>
-
-                        <p style={{ color: '#8a8a8a' }}>
-                          {e.sets}x{e.reps} · {e.descanso}s
-                        </p>
-
-                        {e.video_url && (
-                          <p style={{ color: '#c6ff32', fontSize: 12 }}>
-                            🎥 Video agregado
-                          </p>
-                        )}
-                      </div>
-
-                      <div style={styles.actionsRow}>
-                        <button
-                          style={styles.editButton}
-                          onClick={() => startEditExercise(e)}
-                        >
-                          Editar
-                        </button>
-
-                        <button
-                          style={styles.deleteButton}
-                          onClick={() => deleteExercise(e.id)}
-                        >
-                          Eliminar
-                        </button>
-                      </div>
+              {showNewRutina && (
+                <form onSubmit={handleCreateRutina} className="card" style={{marginBottom:16}}>
+                  <div style={{fontFamily:'"Bebas Neue",sans-serif',fontSize:18,letterSpacing:2,marginBottom:14}}>NUEVA RUTINA</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:10}}>
+                    <div className="form-group" style={{margin:0}}><label>Nombre</label><input value={newNombre} onChange={e=>setNewNombre(e.target.value)} placeholder="Tracción, Empuje..." required/></div>
+                    <div className="form-group" style={{margin:0}}><label>Categoría</label>
+                      <select value={newCat} onChange={e=>setNewCat(e.target.value)}>
+                        {[['traccion','Tracción'],['empuje','Empuje'],['piernas','Piernas'],['core','Core'],['full_body','Full Body'],['cardio','Cardio'],['general','General']].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+                      </select>
                     </div>
+                  </div>
+                  <div className="form-group"><label>Descripción (opcional)</label><input value={newDesc} onChange={e=>setNewDesc(e.target.value)} placeholder="Enfoque de la rutina..."/></div>
+                  <div style={{display:'flex',gap:8}}>
+                    <button type="submit" className="btn btn-primary" disabled={saving}>Crear</button>
+                    <button type="button" className="btn btn-ghost" onClick={()=>setShowNewRutina(false)}>Cancelar</button>
+                  </div>
+                </form>
+              )}
+
+              {rutinas.length === 0 && !showNewRutina && (
+                <div className="card" style={{textAlign:'center',padding:'28px',color:'#555',fontSize:13}}>Sin rutinas — creá la primera</div>
+              )}
+
+              {rutinas.map((r: any) => (
+                <div key={r.id} className="card" style={{marginBottom:14}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12}}>
+                    <div>
+                      <div style={{fontFamily:'"Bebas Neue",sans-serif',fontSize:19,letterSpacing:2,color:'#c8f542'}}>{r.nombre}</div>
+                      {r.descripcion && <div style={{fontSize:12,color:'#666',marginTop:2}}>{r.descripcion}</div>}
+                    </div>
+                    <div style={{display:'flex',gap:6}}>
+                      <button className="btn btn-ghost" style={{fontSize:12,padding:'6px 10px'}}
+                        onClick={()=>{setActiveRutina(r.id);setShowEjForm(true)}}>+ Ejercicio</button>
+                      <button onClick={()=>handleDeleteRutina(r.id)} style={{background:'none',border:'none',color:'#f87171',cursor:'pointer',fontSize:16,padding:'4px 6px'}}>🗑</button>
+                    </div>
+                  </div>
+
+                  {showEjForm && activeRutina===r.id && (
+                    <form onSubmit={handleAddEj} style={{background:'rgba(255,255,255,0.03)',borderRadius:8,padding:14,marginBottom:10}}>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginBottom:10}}>
+                        <div className="form-group" style={{margin:0,gridColumn:'1/-1'}}><label>Ejercicio</label><input value={ejForm.nombre} onChange={e=>setEjForm(p=>({...p,nombre:e.target.value}))} placeholder="Muscle-up, Dominadas..." required autoFocus/></div>
+                        <div className="form-group" style={{margin:0}}><label>Tipo</label>
+                          <select value={ejForm.tipo} onChange={e=>setEjForm(p=>({...p,tipo:e.target.value}))}>
+                            {TIPOS.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
+                          </select>
+                        </div>
+                        <div className="form-group" style={{margin:0}}><label>Series</label><input type="number" min={1} max={20} value={ejForm.series} onChange={e=>setEjForm(p=>({...p,series:parseInt(e.target.value)}))}/></div>
+                        <div className="form-group" style={{margin:0}}><label>Reps/Tiempo</label><input value={ejForm.reps} onChange={e=>setEjForm(p=>({...p,reps:e.target.value}))} placeholder="10 reps / 30s"/></div>
+                        <div className="form-group" style={{margin:0}}><label>Descanso (s)</label><input type="number" min={0} value={ejForm.descanso_s} onChange={e=>setEjForm(p=>({...p,descanso_s:parseInt(e.target.value)}))}/></div>
+                        <div className="form-group" style={{margin:0,gridColumn:'2/-1'}}><label>Notas</label><input value={ejForm.notas} onChange={e=>setEjForm(p=>({...p,notas:e.target.value}))} placeholder="Codos adentro, agarre prono..."/></div>
+                      </div>
+                      <div style={{display:'flex',gap:8}}>
+                        <button type="submit" className="btn btn-primary" disabled={saving} style={{fontSize:13,padding:'7px 14px'}}>Agregar</button>
+                        <button type="button" className="btn btn-ghost" style={{fontSize:13,padding:'7px 12px'}} onClick={()=>{setShowEjForm(false);setActiveRutina(null)}}>Cancelar</button>
+                      </div>
+                    </form>
                   )}
+
+                  {(!r.ejercicios || r.ejercicios.length === 0)
+                    ? <div style={{fontSize:13,color:'#444',padding:'10px 0',textAlign:'center'}}>Sin ejercicios aún</div>
+                    : r.ejercicios.sort((a: any,b: any)=>a.orden-b.orden).map((ej: any,i: number) => (
+                      <div key={ej.id} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 10px',background:'rgba(255,255,255,0.03)',borderRadius:7,marginBottom:5}}>
+                        <div style={{fontFamily:'"Bebas Neue",sans-serif',fontSize:18,color:'#c8f542',width:22,textAlign:'center'}}>{i+1}</div>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:13,fontWeight:500}}>{ej.nombre}</div>
+                          <div style={{fontSize:11,color:'#666',marginTop:1}}>{ej.series} series{ej.reps?` · ${ej.reps}`:''}{ej.notas?` · ${ej.notas}`:''}</div>
+                        </div>
+                        <span style={{fontSize:10,padding:'2px 7px',borderRadius:20,background:ej.tipo==='al_fallo'?'rgba(248,113,113,0.1)':ej.tipo==='series'?'rgba(74,222,128,0.1)':'rgba(96,165,250,0.1)',color:ej.tipo==='al_fallo'?'#f87171':ej.tipo==='series'?'#4ade80':'#60a5fa'}}>
+                          {TIPOS.find(t=>t.value===ej.tipo)?.label}
+                        </span>
+                        <button onClick={()=>handleDeleteEj(r.id,ej.id)} style={{background:'none',border:'none',color:'#555',cursor:'pointer',fontSize:15,padding:'2px 5px'}}
+                          onMouseEnter={e=>(e.currentTarget.style.color='#f87171')} onMouseLeave={e=>(e.currentTarget.style.color='#555')}>×</button>
+                      </div>
+                    ))
+                  }
                 </div>
               ))}
-            </div>
-          </div>
-        ))}
+            </>
+          )}
+        </div>
       </div>
     </div>
   )
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    padding: 30,
-    color: 'white',
-  },
-
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-
-  title: {
-    fontSize: 42,
-    fontWeight: 900,
-  },
-
-  subtitle: {
-    color: '#8a8a8a',
-  },
-
-  refresh: {
-    border: '1px solid #c6ff32',
-    background: 'transparent',
-    color: '#c6ff32',
-    padding: '10px 16px',
-    borderRadius: 12,
-    cursor: 'pointer',
-  },
-
-  success: {
-    background: 'rgba(0,255,100,.1)',
-    border: '1px solid #00ff88',
-    color: '#00ff88',
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 20,
-  },
-
-  error: {
-    background: 'rgba(255,0,0,.1)',
-    border: '1px solid red',
-    color: '#ff8a8a',
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 20,
-  },
-
-  filters: {
-    display: 'flex',
-    gap: 12,
-    marginBottom: 24,
-  },
-
-  input: {
-    flex: 1,
-    background: '#111',
-    border: '1px solid #333',
-    borderRadius: 12,
-    color: 'white',
-    padding: 14,
-    width: '100%',
-    boxSizing: 'border-box',
-    marginBottom: 12,
-  },
-
-  textarea: {
-    width: '100%',
-    minHeight: 100,
-    background: '#111',
-    border: '1px solid #333',
-    borderRadius: 12,
-    color: 'white',
-    padding: 14,
-    marginBottom: 12,
-    boxSizing: 'border-box',
-  },
-
-  select: {
-    background: '#111',
-    border: '1px solid #333',
-    borderRadius: 12,
-    color: 'white',
-    padding: 14,
-    width: '100%',
-    marginBottom: 12,
-  },
-
-  templatesGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))',
-    gap: 20,
-    marginBottom: 30,
-  },
-
-  card: {
-    background: '#111',
-    border: '1px solid #222',
-    borderRadius: 20,
-    padding: 20,
-  },
-
-  tags: {
-    display: 'flex',
-    gap: 8,
-    marginBottom: 12,
-  },
-
-  badge: {
-    background: '#c6ff32',
-    color: 'black',
-    padding: '6px 12px',
-    borderRadius: 999,
-    fontWeight: 800,
-    fontSize: 12,
-  },
-
-  darkBadge: {
-    background: '#222',
-    color: '#ccc',
-    padding: '6px 12px',
-    borderRadius: 999,
-    fontSize: 12,
-  },
-
-  cardTitle: {
-    color: '#c6ff32',
-    fontSize: 30,
-  },
-
-  description: {
-    color: '#ddd',
-  },
-
-  meta: {
-    color: '#8a8a8a',
-  },
-
-  button: {
-    width: '100%',
-    background: '#c6ff32',
-    color: 'black',
-    border: 'none',
-    borderRadius: 14,
-    padding: 14,
-    fontWeight: 900,
-    cursor: 'pointer',
-    marginTop: 14,
-  },
-
-  section: {
-    background: '#111',
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 24,
-  },
-
-  sectionTitle: {
-    fontSize: 28,
-    marginBottom: 20,
-  },
-
-  myRoutine: {
-    background: '#0d0d0d',
-    border: '1px solid #222',
-    borderRadius: 18,
-    padding: 20,
-    marginBottom: 14,
-  },
-
-  routineHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 20,
-  },
-
-  actionsRow: {
-    display: 'flex',
-    gap: 10,
-    alignItems: 'center',
-  },
-
-  deleteButton: {
-    background: '#3b0b0b',
-    color: '#ff7b7b',
-    border: '1px solid #7f1d1d',
-    borderRadius: 10,
-    padding: '8px 12px',
-    cursor: 'pointer',
-    fontWeight: 800,
-  },
-
-  editButton: {
-    background: '#1f2937',
-    color: '#d1d5db',
-    border: '1px solid #374151',
-    borderRadius: 10,
-    padding: '8px 12px',
-    cursor: 'pointer',
-    fontWeight: 800,
-  },
-
-  exercise: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-    color: '#ddd',
-  },
-
-  exerciseEditor: {
-    marginTop: 20,
-    display: 'grid',
-    gap: 12,
-  },
-
-  exerciseBox: {
-    background: '#111',
-    border: '1px solid #222',
-    borderRadius: 14,
-    padding: 14,
-  },
-
-  exerciseView: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 16,
-  },
-
-  editGrid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr 1fr',
-    gap: 10,
-  },
 }
