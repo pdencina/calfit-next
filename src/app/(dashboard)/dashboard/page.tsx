@@ -1,66 +1,40 @@
-'use client'
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
 
-import { useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
+export default async function DashboardPage() {
+  const supabase = await createClient()
 
-export default function DashboardRedirectPage() {
-  useEffect(() => {
-    async function redirectByRole() {
-      const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+  if (!user) {
+    redirect('/login')
+  }
 
-      if (!user) {
-        window.location.href = '/login'
-        return
-      }
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle()
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .maybeSingle()
+  if (!profile?.role) {
+    redirect('/login')
+  }
 
-      if (!profile) {
-        window.location.href = '/login'
-        return
-      }
+  const role = String(profile.role).toLowerCase().trim()
 
-      if (profile.role === 'profe') {
-        window.location.href = '/dashboard/profe'
-        return
-      }
+  if (role === 'profe') {
+    redirect('/dashboard/profe')
+  }
 
-      if (profile.role === 'alumno') {
-        window.location.href = '/dashboard/alumno'
-        return
-      }
+  if (role === 'alumno') {
+    redirect('/dashboard/alumno')
+  }
 
-      if (profile.role === 'super_admin' || profile.role === 'admin') {
-        window.location.href = '/dashboard/admin'
-        return
-      }
+  if (role === 'super_admin' || role === 'admin') {
+    redirect('/dashboard/admin')
+  }
 
-      window.location.href = '/login'
-    }
-
-    redirectByRole()
-  }, [])
-
-  return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: '#000',
-        color: '#fff',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      Redirigiendo...
-    </div>
-  )
+  redirect('/login')
 }
