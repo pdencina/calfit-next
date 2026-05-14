@@ -1,38 +1,66 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+'use client'
 
-export default async function DashboardRedirectPage() {
-  const supabase = await createClient()
+import { useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+export default function DashboardRedirectPage() {
+  useEffect(() => {
+    async function redirectByRole() {
+      const supabase = createClient()
 
-  if (!user) {
-    redirect('/login')
-  }
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .maybeSingle()
+      if (!user) {
+        window.location.href = '/login'
+        return
+      }
 
-  if (!profile) {
-    redirect('/login')
-  }
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle()
 
-  if (profile.role === 'profe') {
-    redirect('/dashboard/profe')
-  }
+      if (!profile) {
+        window.location.href = '/login'
+        return
+      }
 
-  if (profile.role === 'alumno') {
-    redirect('/dashboard/alumno')
-  }
+      if (profile.role === 'profe') {
+        window.location.href = '/dashboard/profe'
+        return
+      }
 
-  if (profile.role === 'super_admin' || profile.role === 'admin') {
-    redirect('/dashboard/admin')
-  }
+      if (profile.role === 'alumno') {
+        window.location.href = '/dashboard/alumno'
+        return
+      }
 
-  redirect('/login')
+      if (profile.role === 'super_admin' || profile.role === 'admin') {
+        window.location.href = '/dashboard/admin'
+        return
+      }
+
+      window.location.href = '/login'
+    }
+
+    redirectByRole()
+  }, [])
+
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        background: '#000',
+        color: '#fff',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      Redirigiendo...
+    </div>
+  )
 }
