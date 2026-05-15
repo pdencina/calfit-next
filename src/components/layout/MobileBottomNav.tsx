@@ -18,7 +18,7 @@ export default function MobileBottomNav({ role }: { role: string }) {
           { href: '/dashboard/alumno', icon: '🏠', label: 'Inicio' },
           { href: '/dashboard/alumno/rutinas', icon: '💪', label: 'Rutinas' },
           { href: '/dashboard/alumno/mensajes', icon: '💬', label: 'Chat' },
-          { href: '/dashboard/alumno/objetivos', icon: '🎯', label: 'Metas' },
+          { href: '/dashboard/alumno/goals', icon: '🎯', label: 'Metas' },
         ]
 
   return (
@@ -27,11 +27,7 @@ export default function MobileBottomNav({ role }: { role: string }) {
         const active = pathname === item.href || pathname.startsWith(item.href + '/')
 
         return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={active ? 'bottom-item active' : 'bottom-item'}
-          >
+          <Link key={item.href} href={item.href} className={active ? 'bottom-item active' : 'bottom-item'}>
             <span>{item.icon}</span>
             <small>{item.label}</small>
           </Link>
