@@ -22,22 +22,10 @@ export default async function DashboardLayout({
     .from('profiles')
     .select('*')
     .eq('id', user.id)
-    .maybeSingle()
+    .single()
 
   if (!profile) {
-    return (
-      <div
-        style={{
-          padding: 40,
-          color: 'white',
-          background: '#000',
-          minHeight: '100vh',
-        }}
-      >
-        <h1>Usuario autenticado, pero sin perfil</h1>
-        <p>{user.email}</p>
-      </div>
-    )
+    redirect('/login')
   }
 
   return (
